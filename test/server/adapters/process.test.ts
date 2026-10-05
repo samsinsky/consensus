@@ -62,7 +62,7 @@ describe('runJsonl', () => {
 
   it('reports a missing binary as a spawn error', async () => {
     const items = await collect(
-      runJsonl({ bin: '/nonexistent/relay-cli', args: [], cwd: '/', signal: new AbortController().signal, timeoutMs: 1000 }),
+      runJsonl({ bin: '/nonexistent/consensus-cli', args: [], cwd: '/', signal: new AbortController().signal, timeoutMs: 1000 }),
     );
     expect(exitOf(items)).toMatchObject({ info: { spawnError: 'ENOENT' } });
   });

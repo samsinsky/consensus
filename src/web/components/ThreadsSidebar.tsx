@@ -12,7 +12,7 @@ export function ThreadsSidebar({ threads, activeId, onSelect, onNew, onSettings 
   return (
     <nav className="sidebar">
       <div className="sidebar-head">
-        <strong>Relay</strong>
+        <strong>Consensus</strong>
         <button className="ghost" onClick={onSettings} title="Settings">Settings</button>
       </div>
       <button className="new-thread" onClick={onNew}>+ New thread</button>

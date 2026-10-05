@@ -26,7 +26,7 @@ export class ThreadStore {
     for (const m of thread.messages) {
       if (m.kind === 'reply' && m.status === 'streaming') {
         m.status = 'error';
-        m.error = { code: 'interrupted', message: 'Relay stopped before this reply finished.' };
+        m.error = { code: 'interrupted', message: 'Consensus stopped before this reply finished.' };
       }
     }
     return thread;
@@ -41,7 +41,7 @@ export class ThreadStore {
         const t = JSON.parse(await readFile(join(this.dir, f), 'utf8')) as Thread;
         summaries.push({ id: t.id, title: t.title, updatedAt: t.updatedAt });
       } catch {
-        console.warn(`relay: skipping unreadable thread file ${f}`);
+        console.warn(`consensus: skipping unreadable thread file ${f}`);
       }
     }
     return summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

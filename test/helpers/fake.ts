@@ -19,7 +19,7 @@ export type FakeScript = {
 const FAKE = fileURLToPath(new URL('./fake-cli.mjs', import.meta.url));
 
 export function fakeCli(script: FakeScript) {
-  const dir = mkdtempSync(join(tmpdir(), 'relay-fake-'));
+  const dir = mkdtempSync(join(tmpdir(), 'consensus-fake-'));
   const scriptFile = join(dir, 'script.json');
   const recordFile = join(dir, 'record.json');
   const lines = (script.lines ?? []).map((l) => (typeof l === 'string' ? l : JSON.stringify(l)));

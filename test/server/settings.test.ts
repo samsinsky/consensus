@@ -7,12 +7,12 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../../src/server/s
 
 describe('settings', () => {
   it('returns defaults when no file exists', async () => {
-    const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+    const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
     expect(await loadSettings(paths)).toEqual(DEFAULT_SETTINGS);
   });
 
   it('round-trips saved settings', async () => {
-    const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+    const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
     const s = structuredClone(DEFAULT_SETTINGS);
     s.defaults.claude = { model: 'sonnet', effort: 'medium' };
     await saveSettings(paths, s);
@@ -20,7 +20,7 @@ describe('settings', () => {
   });
 
   it('fills providers missing from an older file with defaults', async () => {
-    const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+    const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
     await mkdir(dirname(paths.settings), { recursive: true });
     await writeFile(paths.settings, JSON.stringify({ defaults: { claude: { model: 'haiku' } } }));
     const s = await loadSettings(paths);

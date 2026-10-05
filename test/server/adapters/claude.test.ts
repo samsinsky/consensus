@@ -18,7 +18,7 @@ const OK_RUN: FakeScript = {
 
 function setup(script: FakeScript) {
   const fake = fakeCli(script);
-  const adapter = createClaudeAdapter({ workdir: mkdtempSync(join(tmpdir(), 'relay-wd-')), ...fake.options });
+  const adapter = createClaudeAdapter({ workdir: mkdtempSync(join(tmpdir(), 'consensus-wd-')), ...fake.options });
   const req = (over: Partial<SendRequest> = {}): SendRequest => ({
     message: 'Write a headline', model: 'opus', promptHash: 'abc', promptPath: '/tmp/prompt.md',
     signal: new AbortController().signal, ...over,

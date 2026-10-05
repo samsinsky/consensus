@@ -152,7 +152,7 @@ export class Router {
           reply.text += ev.text;
           this.deps.hub.emit(thread.id, { type: 'delta', messageId: reply.id, text: ev.text });
         } else if (ev.type === 'warning') {
-          console.warn(`relay: ${p.provider}: ${ev.message}`);
+          console.warn(`consensus: ${p.provider}: ${ev.message}`);
         } else if (ev.type === 'done') {
           reply.text = ev.text;
           reply.status = 'done';
@@ -183,7 +183,7 @@ export class Router {
     try {
       await this.commit(thread);
     } catch (e) {
-      console.error('relay: could not save the finished reply', e);
+      console.error('consensus: could not save the finished reply', e);
     }
   }
 
@@ -191,7 +191,7 @@ export class Router {
     const prev = this.saves.get(thread.id) ?? Promise.resolve();
     thread.updatedAt = new Date().toISOString();
     const next = prev.then(() => this.deps.store.save(thread));
-    this.saves.set(thread.id, next.catch((e) => console.error('relay: save failed', e)));
+    this.saves.set(thread.id, next.catch((e) => console.error('consensus: save failed', e)));
     this.deps.hub.emit(thread.id, { type: 'thread', thread });
     await next;
   }

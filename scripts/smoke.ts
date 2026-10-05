@@ -38,7 +38,7 @@ async function run(adapter: ProviderAdapter, base: { promptHash: string; promptP
 }
 
 const only = process.argv[2] as ProviderId | undefined;
-const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-smoke-')));
+const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-smoke-')));
 await writePrompt(paths, 'You are a terse test assistant. Follow instructions exactly.\n');
 const promptHash = await snapshotPrompt(paths);
 const base = { promptHash, promptPath: snapshotPath(paths, promptHash) };

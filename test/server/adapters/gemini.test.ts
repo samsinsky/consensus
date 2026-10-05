@@ -19,7 +19,7 @@ const OK_RUN: FakeScript = {
 
 function setup(script: FakeScript) {
   const fake = fakeCli(script);
-  const workdir = mkdtempSync(join(tmpdir(), 'relay-wd-'));
+  const workdir = mkdtempSync(join(tmpdir(), 'consensus-wd-'));
   const promptPath = join(workdir, 'snapshot.md');
   writeFileSync(promptPath, 'You are an experienced editor.\n');
   const adapter = createGeminiAdapter({ workdir, ...fake.options });
@@ -44,16 +44,16 @@ describe('gemini adapter', () => {
   it('writes a tool-less agent carrying the prompt snapshot', async () => {
     const { adapter, req, workdir } = setup(OK_RUN);
     await collect(adapter.send(req()));
-    const agent = await readFile(join(workdir, '.agents', 'agents', 'relay-abc123.md'), 'utf8');
-    expect(agent).toBe('---\nname: relay-abc123\ndescription: Relay prose participant.\ntools: []\n---\nYou are an experienced editor.\n');
-    expect(agentName('abc123')).toBe('relay-abc123');
+    const agent = await readFile(join(workdir, '.agents', 'agents', 'consensus-abc123.md'), 'utf8');
+    expect(agent).toBe('---\nname: consensus-abc123\ndescription: Consensus prose participant.\ntools: []\n---\nYou are an experienced editor.\n');
+    expect(agentName('abc123')).toBe('consensus-abc123');
   });
 
   it('runs the agent with model and stream output, resuming by conversation', async () => {
     const { fake, adapter, req } = setup(OK_RUN);
     await collect(adapter.send(req({ sessionId: 'conv-0' })));
     const args = (await fake.record()).argv;
-    expect(args[args.indexOf('--agent') + 1]).toBe('relay-abc123');
+    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123');
     expect(args[args.indexOf('--model') + 1]).toBe('gemini-3.1-pro-high');
     expect(args[args.indexOf('--output-format') + 1]).toBe('stream-json');
     expect(args[args.indexOf('--conversation') + 1]).toBe('conv-0');

@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAdapters } from './adapters/index.js';
 import { forceKillAllChildren, killAllChildren } from './adapters/process.js';
-import { createRelayServer } from './http.js';
+import { createConsensusServer } from './http.js';
 import { EventHub } from './hub.js';
 import { makePaths } from './paths.js';
 import { readPrompt } from './prompt.js';
@@ -14,7 +14,7 @@ import { ThreadStore } from './store.js';
 
 const args = process.argv.slice(2);
 const portFlag = args.indexOf('--port');
-const port = Number(portFlag >= 0 ? args[portFlag + 1] : process.env.RELAY_PORT ?? 4747);
+const port = Number(portFlag >= 0 ? args[portFlag + 1] : process.env.CONSENSUS_PORT ?? 4747);
 const shouldOpen = !args.includes('--no-open');
 
 const paths = makePaths();
@@ -26,11 +26,11 @@ const hub = new EventHub();
 const adapters = createAdapters(paths);
 const router = new Router({ store, hub, paths, adapters });
 const webDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
-const server = createRelayServer({ router, store, hub, paths, adapters, webDir });
+const server = createConsensusServer({ router, store, hub, paths, adapters, webDir });
 
 server.on('error', (e: NodeJS.ErrnoException) => {
   if (e.code === 'EADDRINUSE') {
-    console.error(`Port ${port} is in use. Is Relay already running? Try: relay --port ${port + 1}`);
+    console.error(`Port ${port} is in use. Is Consensus already running? Try: consensus --port ${port + 1}`);
     process.exit(1);
   }
   throw e;
@@ -38,11 +38,11 @@ server.on('error', (e: NodeJS.ErrnoException) => {
 
 server.listen(port, '127.0.0.1', () => {
   const url = `http://localhost:${port}`;
-  console.log(`Relay running at ${url}`);
+  console.log(`Consensus running at ${url}`);
   if (shouldOpen) spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
 });
 
-// Stop every CLI we started, so a killed Relay never leaves them spending quota.
+// Stop every CLI we started, so a killed Consensus never leaves them spending quota.
 let shuttingDown = false;
 const shutdown = () => {
   if (shuttingDown) return;

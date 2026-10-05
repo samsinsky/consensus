@@ -1,10 +1,10 @@
 {
-  "name": "relay",
+  "name": "consensus",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "relay": "dist/server/cli.js"
+    "consensus": "dist/server/cli.js"
   },
   "scripts": {
     "dev:server": "tsx watch src/server/cli.ts --no-open",

@@ -1,14 +1,14 @@
-# Relay Implementation Plan
+# Consensus Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build Relay, a local web app that routes prose work between Claude, ChatGPT, and Gemini participants through their official CLIs on Sam's existing subscriptions.
+**Goal:** Build Consensus, a local web app that routes prose work between Claude, ChatGPT, and Gemini participants through their official CLIs on Sam's existing subscriptions.
 
-**Architecture:** A Node + TypeScript server spawns `claude`, `codex`, and `agy` headlessly through one adapter interface, keeps threads as JSON files under `~/.relay`, and streams events to a React page over Server-Sent Events. The router sends each message only to its chosen participant and inlines forwarded quotes; Claude and Codex fork their session every turn so a stopped reply never enters memory.
+**Architecture:** A Node + TypeScript server spawns `claude`, `codex`, and `agy` headlessly through one adapter interface, keeps threads as JSON files under `~/.consensus`, and streams events to a React page over Server-Sent Events. The router sends each message only to its chosen participant and inlines forwarded quotes; Claude and Codex fork their session every turn so a stopped reply never enters memory.
 
 **Tech Stack:** Node 24, TypeScript 5, React 19, Vite 7, Vitest 3, react-markdown 10, tsx.
 
-**Spec:** `docs/superpowers/specs/2026-10-05-relay-design.md`
+**Spec:** `docs/superpowers/specs/2026-10-05-consensus-design.md`
 
 ## Global Constraints
 
@@ -17,9 +17,9 @@
 - Provider IDs are exactly `'claude' | 'codex' | 'gemini'`; display names are Claude, ChatGPT, Gemini.
 - The user-facing term is "participant", never "chat", "agent", or "bot". Threads are "threads", never "pieces".
 - Quote format sent to models, verbatim: `Feedback from another reviewer:\n<quoted>\n…\n</quoted>`. Never name the source provider.
-- Data lives under `~/.relay` (override with `RELAY_HOME`): `threads/<id>.json`, `prompts/default.md`, `prompts/snapshots/<hash>.md`, `settings.json`, `workdir/<provider>/`.
+- Data lives under `~/.consensus` (override with `CONSENSUS_HOME`): `threads/<id>.json`, `prompts/default.md`, `prompts/snapshots/<hash>.md`, `settings.json`, `workdir/<provider>/`.
 - Server binds to `127.0.0.1` only. Default port 4747.
-- Each CLI runs in its own empty working directory, `~/.relay/workdir/<provider>`.
+- Each CLI runs in its own empty working directory, `~/.consensus/workdir/<provider>`.
 - Error codes: `not_installed`, `not_logged_in`, `rate_limited`, `timeout`, `interrupted`, `unknown`.
 - Copy in the UI: no em dashes.
 - Verified CLI versions: Claude Code 2.1.289, Codex CLI 0.160.1, Antigravity CLI 1.2.17.
@@ -27,7 +27,7 @@
 ## Review Focus
 
 1. **Sending to a participant whose reply is still streaming:** the server rejects it with 409 and "That participant is still replying."; other participants stay usable. Test: Task 8, "rejects a second send to a busy participant".
-2. **Relay restarts while a reply streams:** on reload the reply shows as an `interrupted` error with Retry, and the participant's session stays at its last completed turn. Test: Task 3, "marks streaming replies as interrupted on load".
+2. **Consensus restarts while a reply streams:** on reload the reply shows as an `interrupted` error with Retry, and the participant's session stays at its last completed turn. Test: Task 3, "marks streaming replies as interrupted on load".
 3. **A corrupt or half-written thread file:** the sidebar still lists every other thread. Test: Task 3, "skips unreadable thread files when listing".
 4. **A CLI missing from PATH:** the reply shows `not_installed` with the install command, and the server keeps running. Test: Task 4, "reports a missing binary as not_installed".
 5. **A message that starts with `-`, or spans many lines with quotes and angle brackets:** the model receives it byte for byte. Tests: Task 5 "passes the message on stdin untouched", Task 6 "sends the prompt on stdin", Task 7 "attaches the prompt to -p= so leading dashes survive".
@@ -37,18 +37,18 @@
 ## File map
 
 ```
-relay/
+consensus/
   package.json, tsconfig.json, tsconfig.server.json, vite.config.ts, vitest.config.ts, .gitignore, README.md
   src/shared/types.ts          domain types shared by server and web
   src/shared/labels.ts         participant and model labels
-  src/server/paths.ts          ~/.relay layout
+  src/server/paths.ts          ~/.consensus layout
   src/server/prompt.ts         default prompt, read/write, snapshots
   src/server/settings.ts       per-provider default model and effort
   src/server/store.ts          ThreadStore: JSON files, atomic writes
   src/server/hub.ts            per-thread event fan-out
   src/server/router.ts         Router: participants, send, stop, retry, model change
   src/server/http.ts           HTTP API, SSE, static files
-  src/server/cli.ts            `relay` entry point
+  src/server/cli.ts            `consensus` entry point
   src/server/adapters/types.ts     ProviderAdapter, SendRequest, AdapterEvent
   src/server/adapters/process.ts   runJsonl: spawn, line parsing, abort, timeout
   src/server/adapters/errors.ts    classifyError
@@ -83,11 +83,11 @@ relay/
 `package.json`:
 ```json
 {
-  "name": "relay",
+  "name": "consensus",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": { "relay": "dist/server/cli.js" },
+  "bin": { "consensus": "dist/server/cli.js" },
   "scripts": {
     "dev:server": "tsx watch src/server/cli.ts --no-open",
     "dev:web": "vite",
@@ -359,7 +359,7 @@ import {
   DEFAULT_PROMPT, promptHash, readPrompt, snapshotPath, snapshotPrompt, writePrompt,
 } from '../../src/server/prompt.js';
 
-const tmpPaths = async () => makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+const tmpPaths = async () => makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
 
 describe('prompt', () => {
   it('creates the default prompt on first read', async () => {
@@ -400,12 +400,12 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../../src/server/s
 
 describe('settings', () => {
   it('returns defaults when no file exists', async () => {
-    const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+    const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
     expect(await loadSettings(paths)).toEqual(DEFAULT_SETTINGS);
   });
 
   it('round-trips saved settings', async () => {
-    const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+    const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
     const s = structuredClone(DEFAULT_SETTINGS);
     s.defaults.claude = { model: 'sonnet', effort: 'medium' };
     await saveSettings(paths, s);
@@ -413,7 +413,7 @@ describe('settings', () => {
   });
 
   it('fills providers missing from an older file with defaults', async () => {
-    const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+    const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
     await mkdir(dirname(paths.settings), { recursive: true });
     await writeFile(paths.settings, JSON.stringify({ defaults: { claude: { model: 'haiku' } } }));
     const s = await loadSettings(paths);
@@ -438,7 +438,7 @@ import type { ProviderId } from '../shared/types.js';
 
 export type Paths = ReturnType<typeof makePaths>;
 
-export function makePaths(home = process.env.RELAY_HOME ?? join(homedir(), '.relay')) {
+export function makePaths(home = process.env.CONSENSUS_HOME ?? join(homedir(), '.consensus')) {
   return {
     home,
     threads: join(home, 'threads'),
@@ -553,7 +553,7 @@ Expected: 6 tests PASS.
 
 ```bash
 git add -A
-git commit -m "feat: add relay paths, system prompt snapshots and settings"
+git commit -m "feat: add consensus paths, system prompt snapshots and settings"
 ```
 
 ---
@@ -579,7 +579,7 @@ import { describe, expect, it } from 'vitest';
 import { ThreadStore } from '../../src/server/store.js';
 
 const newStore = async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'relay-threads-'));
+  const dir = await mkdtemp(join(tmpdir(), 'consensus-threads-'));
   return { dir, store: new ThreadStore(dir) };
 };
 
@@ -679,7 +679,7 @@ export class ThreadStore {
     for (const m of thread.messages) {
       if (m.kind === 'reply' && m.status === 'streaming') {
         m.status = 'error';
-        m.error = { code: 'interrupted', message: 'Relay stopped before this reply finished.' };
+        m.error = { code: 'interrupted', message: 'Consensus stopped before this reply finished.' };
       }
     }
     return thread;
@@ -694,7 +694,7 @@ export class ThreadStore {
         const t = JSON.parse(await readFile(join(this.dir, f), 'utf8')) as Thread;
         summaries.push({ id: t.id, title: t.title, updatedAt: t.updatedAt });
       } catch {
-        console.warn(`relay: skipping unreadable thread file ${f}`);
+        console.warn(`consensus: skipping unreadable thread file ${f}`);
       }
     }
     return summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -840,7 +840,7 @@ export type FakeScript = {
 const FAKE = fileURLToPath(new URL('./fake-cli.mjs', import.meta.url));
 
 export function fakeCli(script: FakeScript) {
-  const dir = mkdtempSync(join(tmpdir(), 'relay-fake-'));
+  const dir = mkdtempSync(join(tmpdir(), 'consensus-fake-'));
   const scriptFile = join(dir, 'script.json');
   const recordFile = join(dir, 'record.json');
   const lines = (script.lines ?? []).map((l) => (typeof l === 'string' ? l : JSON.stringify(l)));
@@ -929,7 +929,7 @@ describe('runJsonl', () => {
 
   it('reports a missing binary as a spawn error', async () => {
     const items = await collect(
-      runJsonl({ bin: '/nonexistent/relay-cli', args: [], cwd: '/', signal: new AbortController().signal, timeoutMs: 1000 }),
+      runJsonl({ bin: '/nonexistent/consensus-cli', args: [], cwd: '/', signal: new AbortController().signal, timeoutMs: 1000 }),
     );
     expect(exitOf(items)).toMatchObject({ info: { spawnError: 'ENOENT' } });
   });
@@ -1163,7 +1163,7 @@ const OK_RUN: FakeScript = {
 
 function setup(script: FakeScript) {
   const fake = fakeCli(script);
-  const adapter = createClaudeAdapter({ workdir: mkdtempSync(join(tmpdir(), 'relay-wd-')), ...fake.options });
+  const adapter = createClaudeAdapter({ workdir: mkdtempSync(join(tmpdir(), 'consensus-wd-')), ...fake.options });
   const req = (over: Partial<SendRequest> = {}): SendRequest => ({
     message: 'Write a headline', model: 'opus', promptHash: 'abc', promptPath: '/tmp/prompt.md',
     signal: new AbortController().signal, ...over,
@@ -1384,7 +1384,7 @@ const OK_RUN: FakeScript = {
 
 function setup(script: FakeScript, codexHome?: string) {
   const fake = fakeCli(script);
-  const adapter = createCodexAdapter({ workdir: mkdtempSync(join(tmpdir(), 'relay-wd-')), codexHome, ...fake.options });
+  const adapter = createCodexAdapter({ workdir: mkdtempSync(join(tmpdir(), 'consensus-wd-')), codexHome, ...fake.options });
   const req = (over: Partial<SendRequest> = {}): SendRequest => ({
     message: 'Write a headline', model: 'gpt-6-luna', promptHash: 'abc', promptPath: '/tmp/my prompt.md',
     signal: new AbortController().signal, ...over,
@@ -1634,7 +1634,7 @@ const OK_RUN: FakeScript = {
 
 function setup(script: FakeScript) {
   const fake = fakeCli(script);
-  const workdir = mkdtempSync(join(tmpdir(), 'relay-wd-'));
+  const workdir = mkdtempSync(join(tmpdir(), 'consensus-wd-'));
   const promptPath = join(workdir, 'snapshot.md');
   writeFileSync(promptPath, 'You are an experienced editor.\n');
   const adapter = createGeminiAdapter({ workdir, ...fake.options });
@@ -1659,16 +1659,16 @@ describe('gemini adapter', () => {
   it('writes a tool-less agent carrying the prompt snapshot', async () => {
     const { adapter, req, workdir } = setup(OK_RUN);
     await collect(adapter.send(req()));
-    const agent = await readFile(join(workdir, '.agents', 'agents', 'relay-abc123.md'), 'utf8');
-    expect(agent).toBe('---\nname: relay-abc123\ndescription: Relay prose participant.\ntools: []\n---\nYou are an experienced editor.\n');
-    expect(agentName('abc123')).toBe('relay-abc123');
+    const agent = await readFile(join(workdir, '.agents', 'agents', 'consensus-abc123.md'), 'utf8');
+    expect(agent).toBe('---\nname: consensus-abc123\ndescription: Consensus prose participant.\ntools: []\n---\nYou are an experienced editor.\n');
+    expect(agentName('abc123')).toBe('consensus-abc123');
   });
 
   it('runs the agent with model and stream output, resuming by conversation', async () => {
     const { fake, adapter, req } = setup(OK_RUN);
     await collect(adapter.send(req({ sessionId: 'conv-0' })));
     const args = (await fake.record()).argv.slice(1);
-    expect(args[args.indexOf('--agent') + 1]).toBe('relay-abc123');
+    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123');
     expect(args[args.indexOf('--model') + 1]).toBe('gemini-3.1-pro-high');
     expect(args[args.indexOf('--output-format') + 1]).toBe('stream-json');
     expect(args[args.indexOf('--conversation') + 1]).toBe('conv-0');
@@ -1731,7 +1731,7 @@ const FALLBACK_MODELS: ModelOption[] = [
 const MODELS_TTL_MS = 10 * 60 * 1000;
 
 export function agentName(promptHash: string): string {
-  return `relay-${promptHash}`;
+  return `consensus-${promptHash}`;
 }
 
 export function createGeminiAdapter(opts: CliOptions): ProviderAdapter {
@@ -1776,7 +1776,7 @@ async function ensureAgent(workdir: string, req: SendRequest): Promise<string> {
   } catch {
     await mkdir(dir, { recursive: true });
     const body = await readFile(req.promptPath, 'utf8');
-    await writeFile(file, `---\nname: ${name}\ndescription: Relay prose participant.\ntools: []\n---\n${body}`);
+    await writeFile(file, `---\nname: ${name}\ndescription: Consensus prose participant.\ntools: []\n---\n${body}`);
   }
   return name;
 }
@@ -1945,7 +1945,7 @@ let store: ThreadStore;
 let hub: EventHub;
 
 beforeEach(async () => {
-  const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+  const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
   claude = controllable('claude');
   codex = controllable('codex');
   store = new ThreadStore(paths.threads);
@@ -2280,7 +2280,7 @@ export class Router {
           reply.text += ev.text;
           this.deps.hub.emit(thread.id, { type: 'delta', messageId: reply.id, text: ev.text });
         } else if (ev.type === 'warning') {
-          console.warn(`relay: ${p.provider}: ${ev.message}`);
+          console.warn(`consensus: ${p.provider}: ${ev.message}`);
         } else if (ev.type === 'done') {
           reply.text = ev.text;
           reply.status = 'done';
@@ -2315,7 +2315,7 @@ export class Router {
     const prev = this.saves.get(thread.id) ?? Promise.resolve();
     thread.updatedAt = new Date().toISOString();
     const next = prev.then(() => this.deps.store.save(thread));
-    this.saves.set(thread.id, next.catch((e) => console.error('relay: save failed', e)));
+    this.saves.set(thread.id, next.catch((e) => console.error('consensus: save failed', e)));
     this.deps.hub.emit(thread.id, { type: 'thread', thread });
     await next;
   }
@@ -2354,7 +2354,7 @@ git commit -m "feat: add router with per-participant routing, stop, retry and mo
 
 ---
 
-### Task 9: HTTP API, SSE, adapter registry, `relay` command
+### Task 9: HTTP API, SSE, adapter registry, `consensus` command
 
 **Files:**
 - Create: `src/server/http.ts`, `src/server/adapters/index.ts`, `src/server/cli.ts`
@@ -2364,7 +2364,7 @@ git commit -m "feat: add router with per-participant routing, stop, retry and mo
 - Consumes: `Router`, `RouterError` (Task 8), `EventHub` (Task 8), `ThreadStore` (Task 3), `readPrompt`, `writePrompt`, `loadSettings`, `saveSettings`, `makePaths` (Task 2), adapters (Tasks 5–7).
 - Produces:
   - `createAdapters(paths: Paths): Record<ProviderId, ProviderAdapter>`
-  - `createRelayServer(deps: { router; store; hub; paths; adapters; webDir?: string }): http.Server`
+  - `createConsensusServer(deps: { router; store; hub; paths; adapters; webDir?: string }): http.Server`
   - HTTP API (all JSON; errors are `{ "error": string }`):
 
 | Method | Path | Body | Response |
@@ -2395,7 +2395,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AdapterEvent, ProviderAdapter, SendRequest } from '../../src/server/adapters/types.js';
-import { createRelayServer } from '../../src/server/http.js';
+import { createConsensusServer } from '../../src/server/http.js';
 import { EventHub } from '../../src/server/hub.js';
 import { makePaths } from '../../src/server/paths.js';
 import { Router } from '../../src/server/router.js';
@@ -2420,17 +2420,17 @@ const fakeAdapter = (id: ProviderId): ProviderAdapter => ({
 });
 
 beforeEach(async () => {
-  const home = await mkdtemp(join(tmpdir(), 'relay-'));
+  const home = await mkdtemp(join(tmpdir(), 'consensus-'));
   const paths = makePaths(home);
   webDir = join(home, 'web');
   await mkdir(webDir);
-  await writeFile(join(webDir, 'index.html'), '<!doctype html><title>Relay</title>');
+  await writeFile(join(webDir, 'index.html'), '<!doctype html><title>Consensus</title>');
   queues = [];
   const store = new ThreadStore(paths.threads);
   const hub = new EventHub();
   const adapters = { claude: fakeAdapter('claude'), codex: fakeAdapter('codex'), gemini: fakeAdapter('gemini') };
   const router = new Router({ store, hub, paths, adapters });
-  server = createRelayServer({ router, store, hub, paths, adapters, webDir });
+  server = createConsensusServer({ router, store, hub, paths, adapters, webDir });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -2510,7 +2510,7 @@ describe('HTTP API', () => {
 
   it('serves the web app and refuses paths outside it', async () => {
     const index = await fetch(base + '/some/client/route');
-    expect(await index.text()).toContain('<title>Relay</title>');
+    expect(await index.text()).toContain('<title>Consensus</title>');
     const status = await new Promise<number>((resolve) => {
       const port = new URL(base).port;
       request({ host: '127.0.0.1', port, path: '/..%2f..%2fpackage.json' }, (res) => resolve(res.statusCode!)).end();
@@ -2538,9 +2538,9 @@ import type { ProviderAdapter } from './types.js';
 
 export function createAdapters(paths: Paths): Record<ProviderId, ProviderAdapter> {
   return {
-    claude: createClaudeAdapter({ workdir: paths.workdir('claude'), bin: process.env.RELAY_CLAUDE_BIN }),
-    codex: createCodexAdapter({ workdir: paths.workdir('codex'), bin: process.env.RELAY_CODEX_BIN }),
-    gemini: createGeminiAdapter({ workdir: paths.workdir('gemini'), bin: process.env.RELAY_AGY_BIN }),
+    claude: createClaudeAdapter({ workdir: paths.workdir('claude'), bin: process.env.CONSENSUS_CLAUDE_BIN }),
+    codex: createCodexAdapter({ workdir: paths.workdir('codex'), bin: process.env.CONSENSUS_CODEX_BIN }),
+    gemini: createGeminiAdapter({ workdir: paths.workdir('gemini'), bin: process.env.CONSENSUS_AGY_BIN }),
   };
 }
 ```
@@ -2579,7 +2579,7 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json',
 };
 
-export function createRelayServer(deps: Deps): Server {
+export function createConsensusServer(deps: Deps): Server {
   const { router, store, hub, paths, adapters } = deps;
 
   const routes: [string, RegExp, Handler][] = [
@@ -2664,7 +2664,7 @@ export function createRelayServer(deps: Deps): Server {
         const status = { not_found: 404, busy: 409, invalid: 400 }[e.code];
         return json(res, status, { error: e.message });
       }
-      console.error('relay:', e);
+      console.error('consensus:', e);
       json(res, 500, { error: e instanceof Error ? e.message : 'Server error.' });
     }
   });
@@ -2724,7 +2724,7 @@ async function serveStatic(webDir: string | undefined, req: IncomingMessage, res
 }
 ```
 
-- [ ] **Step 5: Implement the `relay` command**
+- [ ] **Step 5: Implement the `consensus` command**
 
 `src/server/cli.ts`:
 ```ts
@@ -2734,7 +2734,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAdapters } from './adapters/index.js';
-import { createRelayServer } from './http.js';
+import { createConsensusServer } from './http.js';
 import { EventHub } from './hub.js';
 import { makePaths } from './paths.js';
 import { readPrompt } from './prompt.js';
@@ -2743,7 +2743,7 @@ import { ThreadStore } from './store.js';
 
 const args = process.argv.slice(2);
 const portFlag = args.indexOf('--port');
-const port = Number(portFlag >= 0 ? args[portFlag + 1] : process.env.RELAY_PORT ?? 4747);
+const port = Number(portFlag >= 0 ? args[portFlag + 1] : process.env.CONSENSUS_PORT ?? 4747);
 const shouldOpen = !args.includes('--no-open');
 
 const paths = makePaths();
@@ -2755,11 +2755,11 @@ const hub = new EventHub();
 const adapters = createAdapters(paths);
 const router = new Router({ store, hub, paths, adapters });
 const webDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
-const server = createRelayServer({ router, store, hub, paths, adapters, webDir });
+const server = createConsensusServer({ router, store, hub, paths, adapters, webDir });
 
 server.on('error', (e: NodeJS.ErrnoException) => {
   if (e.code === 'EADDRINUSE') {
-    console.error(`Port ${port} is in use. Is Relay already running? Try: relay --port ${port + 1}`);
+    console.error(`Port ${port} is in use. Is Consensus already running? Try: consensus --port ${port + 1}`);
     process.exit(1);
   }
   throw e;
@@ -2767,7 +2767,7 @@ server.on('error', (e: NodeJS.ErrnoException) => {
 
 server.listen(port, '127.0.0.1', () => {
   const url = `http://localhost:${port}`;
-  console.log(`Relay running at ${url}`);
+  console.log(`Consensus running at ${url}`);
   if (shouldOpen) spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
 });
 ```
@@ -2781,7 +2781,7 @@ Expected: all tests PASS (5 new); typecheck clean.
 
 ```bash
 git add -A
-git commit -m "feat: add HTTP API with SSE streaming and relay command"
+git commit -m "feat: add HTTP API with SSE streaming and consensus command"
 ```
 
 ---
@@ -2975,7 +2975,7 @@ Expected: 6 tests PASS.
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Relay</title>
+    <title>Consensus</title>
   </head>
   <body>
     <div id="root"></div>
@@ -3077,7 +3077,7 @@ export function ThreadsSidebar({ threads, activeId, onSelect, onNew, onSettings 
   return (
     <nav className="sidebar">
       <div className="sidebar-head">
-        <strong>Relay</strong>
+        <strong>Consensus</strong>
         <button className="ghost" onClick={onSettings} title="Settings">Settings</button>
       </div>
       <button className="new-thread" onClick={onNew}>+ New thread</button>
@@ -3895,7 +3895,7 @@ async function run(adapter: ProviderAdapter, base: { promptHash: string; promptP
 }
 
 const only = process.argv[2] as ProviderId | undefined;
-const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-smoke-')));
+const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-smoke-')));
 await writePrompt(paths, 'You are a terse test assistant. Follow instructions exactly.\n');
 const promptHash = await snapshotPrompt(paths);
 const base = { promptHash, promptPath: snapshotPath(paths, promptHash) };
@@ -3939,7 +3939,7 @@ Expected: 12 PASS lines and "All checks passed". If a provider fails, rerun only
 
 `README.md`:
 ````markdown
-# Relay
+# Consensus
 
 Route prose work between Claude, ChatGPT, and Gemini participants in one thread, on your existing subscriptions.
 
@@ -3949,13 +3949,13 @@ Route prose work between Claude, ChatGPT, and Gemini participants in one thread,
    - Claude Code: `curl -fsSL https://claude.ai/install.sh | bash`, then `claude` and `/login`
    - Codex CLI: `npm i -g @openai/codex`, then `codex login` (choose ChatGPT)
    - Antigravity CLI: `curl -fsSL https://antigravity.google/cli/install.sh | bash`, then `agy` to sign in, then quit
-2. Build and link Relay:
+2. Build and link Consensus:
    ```bash
    npm install
    npm run build
    npm link
    ```
-3. Run `relay`. The app opens at http://localhost:4747.
+3. Run `consensus`. The app opens at http://localhost:4747.
 
 ## Daily use
 
@@ -3965,7 +3965,7 @@ Route prose work between Claude, ChatGPT, and Gemini participants in one thread,
 - **Panes** shows each participant's conversation side by side.
 - **Settings** edits the system prompt (applies to new participants) and default models.
 
-Data lives in `~/.relay`. Threads are plain JSON in `~/.relay/threads`.
+Data lives in `~/.consensus`. Threads are plain JSON in `~/.consensus/threads`.
 
 ## Development
 
@@ -3981,13 +3981,13 @@ Run `npm run smoke` after upgrading any of the three CLIs.
 
 - [ ] **Step 4: Install the command**
 
-Run: `npm run build && npm link && which relay`
-Expected: prints a path ending in `/relay`.
+Run: `npm run build && npm link && which consensus`
+Expected: prints a path ending in `/consensus`.
 
 - [ ] **Step 5: Quality check with Sam**
 
-Run `relay`. With Sam, rerun his earlier Codex vs ChatGPT comparison: same prompt and copy, sent to ChatGPT · gpt-6-luna high, Claude · opus high, and Gemini · gemini-3.1-pro-high in one thread. Sam compares the replies with the ChatGPT web app's answer.
-Expected: Sam judges the replies at least as deep and useful as the web app's. If one provider reads noticeably more coding-flavored or terse, note it and adjust `~/.relay/prompts/default.md` from Settings before closing the task.
+Run `consensus`. With Sam, rerun his earlier Codex vs ChatGPT comparison: same prompt and copy, sent to ChatGPT · gpt-6-luna high, Claude · opus high, and Gemini · gemini-3.1-pro-high in one thread. Sam compares the replies with the ChatGPT web app's answer.
+Expected: Sam judges the replies at least as deep and useful as the web app's. If one provider reads noticeably more coding-flavored or terse, note it and adjust `~/.consensus/prompts/default.md` from Settings before closing the task.
 
 - [ ] **Step 6: Commit**
 

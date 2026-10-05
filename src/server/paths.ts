@@ -4,7 +4,7 @@ import type { ProviderId } from '../shared/types.js';
 
 export type Paths = ReturnType<typeof makePaths>;
 
-export function makePaths(home = process.env.RELAY_HOME ?? join(homedir(), '.relay')) {
+export function makePaths(home = process.env.CONSENSUS_HOME ?? join(homedir(), '.consensus')) {
   return {
     home,
     threads: join(home, 'threads'),

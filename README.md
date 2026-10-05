@@ -1,4 +1,4 @@
-# Relay
+# Consensus
 
 Route prose work between Claude, ChatGPT, and Gemini participants in one thread, on your existing subscriptions.
 
@@ -8,13 +8,13 @@ Route prose work between Claude, ChatGPT, and Gemini participants in one thread,
    - Claude Code: `curl -fsSL https://claude.ai/install.sh | bash`, then `claude` and `/login`
    - Codex CLI: `npm i -g @openai/codex`, then `codex login` (choose ChatGPT)
    - Antigravity CLI: `curl -fsSL https://antigravity.google/cli/install.sh | bash`, then `agy` to sign in, then quit
-2. Build and link Relay:
+2. Build and link Consensus:
    ```bash
    npm install
    npm run build
    npm link
    ```
-3. Run `relay`. The app opens at http://localhost:4747.
+3. Run `consensus`. The app opens at http://localhost:4747.
 
 ## Daily use
 
@@ -24,7 +24,7 @@ Route prose work between Claude, ChatGPT, and Gemini participants in one thread,
 - **Panes** shows each participant's conversation side by side.
 - **Settings** edits the system prompt (applies to new participants) and default models.
 
-Data lives in `~/.relay`. Threads are plain JSON in `~/.relay/threads`.
+Data lives in `~/.consensus`. Threads are plain JSON in `~/.consensus/threads`.
 
 ## Development
 

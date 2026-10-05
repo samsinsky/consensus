@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ThreadStore } from '../../src/server/store.js';
 
 const newStore = async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'relay-threads-'));
+  const dir = await mkdtemp(join(tmpdir(), 'consensus-threads-'));
   return { dir, store: new ThreadStore(dir) };
 };
 

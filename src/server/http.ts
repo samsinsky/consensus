@@ -29,7 +29,7 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json',
 };
 
-export function createRelayServer(deps: Deps): Server {
+export function createConsensusServer(deps: Deps): Server {
   const { router, store, hub, paths, adapters } = deps;
 
   const routes: [string, RegExp, Handler][] = [
@@ -72,7 +72,7 @@ export function createRelayServer(deps: Deps): Server {
         ? body.quotes.filter((q: any) => typeof q?.text === 'string').map((q: any) => ({ messageId: String(q.messageId ?? ''), text: q.text }))
         : [];
       const { userMessageId, replyMessageId, done } = await router.send(id, { to: body.to, text: body.text, quotes });
-      done.catch((e) => console.error('relay: reply failed', e));
+      done.catch((e) => console.error('consensus: reply failed', e));
       json(res, 202, { userMessageId, replyMessageId });
     }],
     ['POST', re(`/api/threads/${ID}/replies/${ID}/stop`), async (_q, res, [id, rid]) => {
@@ -81,7 +81,7 @@ export function createRelayServer(deps: Deps): Server {
     }],
     ['POST', re(`/api/threads/${ID}/replies/${ID}/retry`), async (_q, res, [id, rid]) => {
       const { userMessageId, replyMessageId, done } = await router.retry(id, rid);
-      done.catch((e) => console.error('relay: reply failed', e));
+      done.catch((e) => console.error('consensus: reply failed', e));
       json(res, 202, { userMessageId, replyMessageId });
     }],
     ['GET', /^\/api\/models$/, async (_q, res) => {
@@ -119,7 +119,7 @@ export function createRelayServer(deps: Deps): Server {
         const status = { not_found: 404, busy: 409, invalid: 400 }[e.code];
         return json(res, status, { error: e.message });
       }
-      console.error('relay:', e);
+      console.error('consensus:', e);
       json(res, 500, { error: e instanceof Error ? e.message : 'Server error.' });
     }
   });
@@ -136,7 +136,7 @@ function hostnameOf(value: string | undefined): string | undefined {
 
 function refuseForeign(req: IncomingMessage): { status: number; error: string } | undefined {
   const host = hostnameOf(req.headers.host);
-  if (!host || !LOCAL_HOSTS.has(host)) return { status: 403, error: 'Relay only answers requests addressed to localhost.' };
+  if (!host || !LOCAL_HOSTS.has(host)) return { status: 403, error: 'Consensus only answers requests addressed to localhost.' };
   const origin = req.headers.origin;
   if (origin && !LOCAL_HOSTS.has(hostnameOf(origin) ?? '')) return { status: 403, error: 'Cross-origin requests are not allowed.' };
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD' && (Number(req.headers['content-length'] ?? 0) > 0 || !!req.headers['transfer-encoding']);

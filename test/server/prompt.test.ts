@@ -7,7 +7,7 @@ import {
   DEFAULT_PROMPT, promptHash, readPrompt, snapshotPath, snapshotPrompt, writePrompt,
 } from '../../src/server/prompt.js';
 
-const tmpPaths = async () => makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+const tmpPaths = async () => makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
 
 describe('prompt', () => {
   it('creates the default prompt on first read', async () => {

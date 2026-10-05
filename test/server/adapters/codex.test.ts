@@ -17,7 +17,7 @@ const OK_RUN: FakeScript = {
 
 function setup(script: FakeScript, codexHome?: string) {
   const fake = fakeCli(script);
-  const adapter = createCodexAdapter({ workdir: mkdtempSync(join(tmpdir(), 'relay-wd-')), codexHome, ...fake.options });
+  const adapter = createCodexAdapter({ workdir: mkdtempSync(join(tmpdir(), 'consensus-wd-')), codexHome, ...fake.options });
   const req = (over: Partial<SendRequest> = {}): SendRequest => ({
     message: 'Write a headline', model: 'gpt-6-luna', promptHash: 'abc', promptPath: '/tmp/my prompt.md',
     signal: new AbortController().signal, ...over,

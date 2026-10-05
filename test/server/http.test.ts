@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AdapterEvent, ProviderAdapter, SendRequest } from '../../src/server/adapters/types.js';
-import { createRelayServer } from '../../src/server/http.js';
+import { createConsensusServer } from '../../src/server/http.js';
 import { EventHub } from '../../src/server/hub.js';
 import { makePaths } from '../../src/server/paths.js';
 import { Router } from '../../src/server/router.js';
@@ -30,17 +30,17 @@ const fakeAdapter = (id: ProviderId): ProviderAdapter => ({
 });
 
 beforeEach(async () => {
-  const home = await mkdtemp(join(tmpdir(), 'relay-'));
+  const home = await mkdtemp(join(tmpdir(), 'consensus-'));
   const paths = makePaths(home);
   webDir = join(home, 'web');
   await mkdir(webDir);
-  await writeFile(join(webDir, 'index.html'), '<!doctype html><title>Relay</title>');
+  await writeFile(join(webDir, 'index.html'), '<!doctype html><title>Consensus</title>');
   queues = [];
   const store = new ThreadStore(paths.threads);
   const hub = new EventHub();
   const adapters = { claude: fakeAdapter('claude'), codex: fakeAdapter('codex'), gemini: fakeAdapter('gemini') };
   const router = new Router({ store, hub, paths, adapters });
-  server = createRelayServer({ router, store, hub, paths, adapters, webDir });
+  server = createConsensusServer({ router, store, hub, paths, adapters, webDir });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -120,7 +120,7 @@ describe('HTTP API', () => {
 
   it('serves the web app and refuses paths outside it', async () => {
     const index = await fetch(base + '/some/client/route');
-    expect(await index.text()).toContain('<title>Relay</title>');
+    expect(await index.text()).toContain('<title>Consensus</title>');
     const status = await new Promise<number>((resolve) => {
       const port = new URL(base).port;
       request({ host: '127.0.0.1', port, path: '/..%2f..%2fpackage.json' }, (res) => resolve(res.statusCode!)).end();

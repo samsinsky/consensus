@@ -1,13 +1,13 @@
-# Relay: design spec
+# Consensus: design spec
 
 Date: 2026-10-05
 Status: Draft for review
 
 ## Purpose
 
-Sam improves copy by routing one LLM's feedback to another. Today he copies text between ChatGPT, Claude, and Gemini tabs by hand. Relay replaces the copy-paste with a single local app that routes messages between models and runs on his existing ChatGPT, Claude, and Google subscriptions. No API keys, no per-token billing.
+Sam improves copy by routing one LLM's feedback to another. Today he copies text between ChatGPT, Claude, and Gemini tabs by hand. Consensus replaces the copy-paste with a single local app that routes messages between models and runs on his existing ChatGPT, Claude, and Google subscriptions. No API keys, no per-token billing.
 
-No free tool does this. Existing multi-model extensions (ChatHub, TabGPT, XPrompt, GenAIPromptExtension) broadcast one prompt to many models; none relay one model's output into another with a new instruction.
+No free tool does this. Existing multi-model extensions (ChatHub, TabGPT, XPrompt, GenAIPromptExtension) broadcast one prompt to many models; none consensus one model's output into another with a new instruction.
 
 ### Success criteria
 
@@ -34,7 +34,7 @@ No free tool does this. Existing multi-model extensions (ChatHub, TabGPT, XPromp
 
 ## Approach
 
-Relay drives each provider's official CLI headlessly, signed in with Sam's subscription:
+Consensus drives each provider's official CLI headlessly, signed in with Sam's subscription:
 
 | Provider | CLI | Subscription |
 |---|---|---|
@@ -62,7 +62,7 @@ We rejected a browser extension that drives the chat websites. It keeps native c
 
 ### Launch
 
-Sam runs `relay`. The command starts the local server and opens the browser to the app.
+Sam runs `consensus`. The command starts the local server and opens the browser to the app.
 
 ### Provider adapters
 
@@ -85,11 +85,11 @@ interface ProviderAdapter {
 
 Every adapter:
 
-- Replaces the CLI's system prompt with the Relay prompt (Claude: `--system-prompt-file`; Codex: `-c model_instructions_file=…`; Gemini: a Relay custom agent at `.agents/agents/relay-<hash>.md` in its working directory, run with `--agent`).
+- Replaces the CLI's system prompt with the Consensus prompt (Claude: `--system-prompt-file`; Codex: `-c model_instructions_file=…`; Gemini: a Consensus custom agent at `.agents/agents/consensus-<hash>.md` in its working directory, run with `--agent`).
 - Disables tools (Claude: `--tools ""`; Codex: `-s read-only` plus disabled plugins and `notify=[]`; Gemini: `tools: []` in the agent file).
 - Sets model and effort per call, so a model change applies on the next message.
 - Resumes the participant's conversation by session ID. Claude and Codex fork from the last completed session on every turn (`--fork-session`, `codex exec fork`), so a stopped turn never enters memory; the adapter discards the fork. Antigravity drops a cancelled turn on its own.
-- Runs in an empty working directory under `~/.relay/workdir/<provider>`, so no `CLAUDE.md`, `AGENTS.md`, or project files leak into prose feedback. The Claude adapter passes `--setting-sources ""` and `--strict-mcp-config` to ignore `~/.claude`. (`--bare` would isolate further but refuses subscription sign-in.)
+- Runs in an empty working directory under `~/.consensus/workdir/<provider>`, so no `CLAUDE.md`, `AGENTS.md`, or project files leak into prose feedback. The Claude adapter passes `--setting-sources ""` and `--strict-mcp-config` to ignore `~/.claude`. (`--bare` would isolate further but refuses subscription sign-in.)
 - Maps CLI failures to typed errors: `not_installed` (with the install command), `not_logged_in` (with the fix command, such as `codex login`), `rate_limited`, `timeout`, `unknown`.
 
 Verified behavior (2026-10-05, Claude Code 2.1.289, Codex CLI 0.160.1, Antigravity CLI 1.2.17):
@@ -120,7 +120,7 @@ Adding a provider later means writing one adapter.
 
 ### Thread store
 
-One JSON file per thread at `~/.relay/threads/<id>.json`:
+One JSON file per thread at `~/.consensus/threads/<id>.json`:
 
 ```ts
 type Thread = {
@@ -183,7 +183,7 @@ Writes go to a temp file and rename into place, so a crash never corrupts a thre
 
 ## System prompt
 
-One global file at `~/.relay/prompts/default.md`, editable in Settings. Each participant reads it when it starts; edits apply to new participants. Starting content covers:
+One global file at `~/.consensus/prompts/default.md`, editable in Settings. Each participant reads it when it starts; edits apply to new participants. Starting content covers:
 
 - You are an experienced editor and copywriter working with the user on prose.
 - Respond as you would in a chat app: full rewrites when asked, reasoning behind edits, alternatives when useful, formatting that suits the content.
@@ -194,10 +194,10 @@ One global file at `~/.relay/prompts/default.md`, editable in Settings. Each par
 
 ## Open questions (resolved 2026-10-05)
 
-1. **Gemini access.** Gemini CLI no longer serves individual accounts; Relay uses Antigravity CLI, which resumes by stable `conversation_id`.
+1. **Gemini access.** Gemini CLI no longer serves individual accounts; Consensus uses Antigravity CLI, which resumes by stable `conversation_id`.
 2. **Stop and memory.** Claude and Codex persist partial turns, so their adapters fork per turn and discard stopped forks. Antigravity drops cancelled turns itself.
 3. **Claude isolation.** `--setting-sources ""` with `--strict-mcp-config`; a probe confirmed no `CLAUDE.md` content reaches the model.
-4. **Tool disabling.** See the adapter list above. Codex and Antigravity still send their tool schemas (about 11k and 2k input tokens per turn); the models follow the Relay prompt regardless.
+4. **Tool disabling.** See the adapter list above. Codex and Antigravity still send their tool schemas (about 11k and 2k input tokens per turn); the models follow the Consensus prompt regardless.
 5. **Codex install.** Installed and signed in with ChatGPT.
 
 ## Testing
@@ -205,13 +205,13 @@ One global file at `~/.relay/prompts/default.md`, editable in Settings. Each par
 1. **Adapter tests (no quota):** each adapter runs against a fake CLI that replays recorded output. Covers streaming, session capture, resume, model change, Stop, and each error type.
 2. **Router and store tests:** a message reaches only its participant; quotes inline in the fixed format; threads round-trip through disk exactly; atomic writes survive a simulated crash.
 3. **Live smoke test (manual, small quota):** per real CLI, send "reply OK", resume, change model, Stop. Run after any CLI upgrade.
-4. **Quality check:** rerun Sam's Codex vs. ChatGPT comparison with the Relay prompt and high effort; confirm replies match ChatGPT's depth.
+4. **Quality check:** rerun Sam's Codex vs. ChatGPT comparison with the Consensus prompt and high effort; confirm replies match ChatGPT's depth.
 
 ## Future work
 
 ### Automatic looped routing
 
-Sam picks two or more participants and an instruction, such as "revise" for one and "critique" for the other. Relay then routes replies between them without manual forwarding until one of three conditions ends the loop:
+Sam picks two or more participants and an instruction, such as "revise" for one and "critique" for the other. Consensus then routes replies between them without manual forwarding until one of three conditions ends the loop:
 
 - **Convergence:** the critic approves the version, or successive versions stop changing meaningfully.
 - **Stuck loop:** the participants repeat earlier versions or trade the same objections.
@@ -234,4 +234,4 @@ A single document all participants can edit, with highlight-to-ask and per-versi
 - Server: a small HTTP server with Server-Sent Events for streaming.
 - UI: React with Vite.
 - Tests: Vitest.
-- Single package; `relay` installed via `npm link`.
+- Single package; `consensus` installed via `npm link`.

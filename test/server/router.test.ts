@@ -34,7 +34,7 @@ let store: ThreadStore;
 let hub: EventHub;
 
 beforeEach(async () => {
-  const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+  const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
   claude = controllable('claude');
   codex = controllable('codex');
   store = new ThreadStore(paths.threads);
@@ -203,7 +203,7 @@ describe('Router when saving fails', () => {
   }
 
   async function setup() {
-    const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+    const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
     const flaky = new FlakyStore(paths.threads);
     const c = controllable('claude');
     const r = new Router({ store: flaky, hub: new EventHub(), paths, adapters: { claude: c.adapter, codex: controllable('codex').adapter, gemini: controllable('gemini').adapter } });

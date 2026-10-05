@@ -12,7 +12,7 @@ const FALLBACK_MODELS: ModelOption[] = [
 const MODELS_TTL_MS = 10 * 60 * 1000;
 
 export function agentName(promptHash: string): string {
-  return `relay-${promptHash}`;
+  return `consensus-${promptHash}`;
 }
 
 export function createGeminiAdapter(opts: CliOptions): ProviderAdapter {
@@ -57,7 +57,7 @@ async function ensureAgent(workdir: string, req: SendRequest): Promise<string> {
   } catch {
     await mkdir(dir, { recursive: true });
     const body = await readFile(req.promptPath, 'utf8');
-    await writeFile(file, `---\nname: ${name}\ndescription: Relay prose participant.\ntools: []\n---\n${body}`);
+    await writeFile(file, `---\nname: ${name}\ndescription: Consensus prose participant.\ntools: []\n---\n${body}`);
   }
   return name;
 }
