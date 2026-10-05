@@ -7,7 +7,10 @@ type Props = { thread: Thread; messages: Message[]; onForward: (q: Quote) => voi
 export function MessageList({ thread, messages, onForward }: Props) {
   const end = useRef<HTMLDivElement>(null);
   const lastText = messages.at(-1)?.kind === 'reply' ? (messages.at(-1) as { text: string }).text.length : 0;
-  useEffect(() => end.current?.scrollIntoView({ block: 'end' }), [messages.length, lastText]);
+  // Braces matter: Chrome's scrollIntoView returns a Promise, which React would call as a cleanup.
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: 'end' });
+  }, [messages.length, lastText]);
   return (
     <div className="messages">
       {messages.map((m) => (
