@@ -231,3 +231,13 @@ describe('Router when saving fails', () => {
     await expect(r.send(t.id, { to: p.id, text: 'Again' })).resolves.toBeDefined();
   });
 });
+
+describe('Router participant numbering', () => {
+  it('numbers participants per provider in creation order', async () => {
+    const t = await router.createThread();
+    const a = await router.addParticipant(t.id, { provider: 'claude', model: 'opus' });
+    const b = await router.addParticipant(t.id, { provider: 'codex', model: 'gpt-6-luna' });
+    const c = await router.addParticipant(t.id, { provider: 'claude', model: 'opus' });
+    expect([a.ordinal, b.ordinal, c.ordinal]).toEqual([1, 1, 2]);
+  });
+});

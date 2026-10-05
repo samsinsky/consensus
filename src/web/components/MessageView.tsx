@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import Markdown from 'react-markdown';
-import { participantLabel } from '../../shared/labels.js';
+import { participantLabel, participantName, replyLabel } from '../../shared/labels.js';
 import type { Message, Quote, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
 
@@ -17,7 +17,8 @@ export function MessageView({ thread, message, onForward }: Props) {
   const act = (fn: () => Promise<unknown>) => fn().catch((e: Error) => setActionError(e.message));
 
   if (message.kind === 'model_change') {
-    return <div className="marker">{label(message.participant)} switched from {message.from} to {message.to}</div>;
+    const p = thread.participants.find((x) => x.id === message.participant);
+    return <div className="marker">{p ? participantName(p, thread.participants) : 'Removed participant'} switched from {message.from} to {message.to}</div>;
   }
 
   if (message.kind === 'user') {
@@ -39,10 +40,11 @@ export function MessageView({ thread, message, onForward }: Props) {
     onForward({ messageId: message.id, text: inside ? sel!.toString() : message.text });
   };
 
+  const author = thread.participants.find((x) => x.id === message.from);
   return (
     <div className={`msg reply ${message.status}`}>
       <div className="msg-head">
-        <span className={`dot ${provider(message.from)}`} /> {label(message.from)}
+        <span className={`dot ${provider(message.from)}`} /> {author ? replyLabel(message, author, thread.participants) : 'Removed participant'}
         {message.status === 'stopped' && <span className="badge">stopped</span>}
       </div>
       <div className="msg-body" ref={body}>

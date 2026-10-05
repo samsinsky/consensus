@@ -20,6 +20,8 @@ export type Participant = {
   sessionId?: string;
   /** Hash of the system prompt snapshot this participant started with. */
   promptHash: string;
+  /** 1-based position among this thread's participants from the same provider; fixed at creation. */
+  ordinal?: number;
   createdAt: string;
 };
 

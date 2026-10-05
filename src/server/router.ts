@@ -61,6 +61,7 @@ export class Router {
       model: input.model,
       effort: input.effort || undefined,
       promptHash: await snapshotPrompt(this.deps.paths),
+      ordinal: thread.participants.filter((x) => x.provider === input.provider).length + 1,
       createdAt: new Date().toISOString(),
     };
     thread.participants.push(participant);
