@@ -40,9 +40,11 @@ Relay drives each provider's official CLI headlessly, signed in with Sam's subsc
 |---|---|---|
 | Claude | Claude Code (`claude -p`) | Claude plan |
 | ChatGPT | Codex CLI (`codex exec`) | ChatGPT plan |
-| Gemini | Gemini CLI (`gemini`) | Google plan |
+| Gemini | Antigravity CLI (`agy -p`) | Google AI plan |
 
-We rejected a browser extension that drives the chat websites. It keeps native chat history and features, but breaks whenever a site changes its DOM, and Chrome throttles input in background tabs. The CLIs offer stable, scriptable interfaces. Each CLI lets us replace its coding-focused system prompt entirely, which removes the coding bias.
+Google stopped serving Gemini CLI to individual Google AI accounts on 2026-06-18; Antigravity CLI replaced it.
+
+We rejected a browser extension that drives the chat websites. It keeps native chat history and features, but breaks whenever a site changes its DOM, and Chrome throttles input in background tabs. The CLIs offer stable, scriptable interfaces. Each CLI lets us replace its coding-focused system prompt, which removes the coding bias.
 
 ## Architecture
 
@@ -54,7 +56,7 @@ We rejected a browser extension that drives the chat websites. It keeps native c
 │ Participant chip │            │  Provider adapters               │
 └──────────────────┘            │   claude → claude -p …           │──▶ Claude plan
                                 │   codex  → codex exec …          │──▶ ChatGPT plan
-                                │   gemini → gemini …              │──▶ Google plan
+                                │   gemini → agy -p …              │──▶ Google plan
                                 └──────────────────────────────────┘
 ```
 
@@ -83,12 +85,22 @@ interface ProviderAdapter {
 
 Every adapter:
 
-- Replaces the CLI's system prompt with the Relay prompt file (Claude: `--system-prompt-file`; Codex: `-c model_instructions_file=…`; Gemini: `GEMINI_SYSTEM_MD=…`).
-- Disables file and shell tools (Claude: `--tools ""`; Codex and Gemini: equivalent settings, confirmed during the build).
+- Replaces the CLI's system prompt with the Relay prompt (Claude: `--system-prompt-file`; Codex: `-c model_instructions_file=…`; Gemini: a Relay custom agent at `.agents/agents/relay-<hash>.md` in its working directory, run with `--agent`).
+- Disables tools (Claude: `--tools ""`; Codex: `-s read-only` plus disabled plugins and `notify=[]`; Gemini: `tools: []` in the agent file).
 - Sets model and effort per call, so a model change applies on the next message.
-- Resumes the participant's conversation by session ID.
-- Runs in an empty working directory under `~/.relay/workdir`, so no `CLAUDE.md`, `AGENTS.md`, or project files leak into prose feedback. The Claude adapter also ignores user settings in `~/.claude` (flag confirmed during the build).
-- Maps CLI failures to typed errors: `not_logged_in` (with the fix command, such as `codex login`), `rate_limited`, `timeout`, `unknown`.
+- Resumes the participant's conversation by session ID. Claude and Codex fork from the last completed session on every turn (`--fork-session`, `codex exec fork`), so a stopped turn never enters memory; the adapter discards the fork. Antigravity drops a cancelled turn on its own.
+- Runs in an empty working directory under `~/.relay/workdir/<provider>`, so no `CLAUDE.md`, `AGENTS.md`, or project files leak into prose feedback. The Claude adapter passes `--setting-sources ""` and `--strict-mcp-config` to ignore `~/.claude`. (`--bare` would isolate further but refuses subscription sign-in.)
+- Maps CLI failures to typed errors: `not_installed` (with the install command), `not_logged_in` (with the fix command, such as `codex login`), `rate_limited`, `timeout`, `unknown`.
+
+Verified behavior (2026-10-05, Claude Code 2.1.289, Codex CLI 0.160.1, Antigravity CLI 1.2.17):
+
+| | Claude | Codex | Antigravity |
+|---|---|---|---|
+| Streams text deltas | Yes | No; whole reply at once | Yes |
+| Session ID source | `session_id` on every event | `thread.started.thread_id` | `conversation_id` on `init` |
+| Model change on resume | Yes | Yes, with a warning event | Yes |
+| Effort | `--effort` | `-c model_reasoning_effort=` | Baked into the model slug (`gemini-3.1-pro-high`) |
+| Model list | Static aliases (`opus`, `sonnet`, `haiku`) | `~/.codex/models_cache.json` | `agy models` |
 
 Adding a provider later means writing one adapter.
 
@@ -142,7 +154,7 @@ Writes go to a temp file and rename into place, so a crash never corrupts a thre
 ### Timeline view
 
 - One column holding every message in the thread, in order. Each message shows a provider-colored mark and a label such as "You → ChatGPT · Luna high" or "ChatGPT · Luna high".
-- Replies stream in live.
+- Replies stream in live where the CLI supports it; Codex replies appear whole when complete.
 - Every reply has **Forward ▸**. Highlighting text inside a reply and clicking Forward attaches only that excerpt. A message can carry several quotes; attached quotes appear above the composer and can be removed.
 - Model changes appear as inline markers.
 
@@ -153,7 +165,7 @@ Writes go to a temp file and rename into place, so a crash never corrupts a thre
   - The thread's participants, to switch the target.
   - **New participant ▸ provider ▸ model and effort**, to add a fresh participant with no history.
   - **Change model** on each participant, limited to the same provider.
-- **Stop** appears while a reply streams. Stop kills the CLI process, keeps the partial text in the timeline marked *stopped*, and leaves it forwardable. The goal: the stopped reply stays out of the participant's memory, so the next message continues as if the reply never happened. The build confirms each CLI's behavior and documents any exception.
+- **Stop** appears while a reply streams. Stop kills the CLI process, keeps the partial text in the timeline marked *stopped*, and leaves it forwardable. The stopped reply stays out of the participant's memory, so the next message continues as if the reply never happened.
 
 ### Panes view
 
@@ -180,15 +192,13 @@ One global file at `~/.relay/prompts/default.md`, editable in Settings. Each par
 - Don't invent facts, figures, quotes, names, or claims. When copy needs a fact you don't have, write a bracketed placeholder such as `[STAT: % reduction in food cost]` and say what's needed.
 - Treat factual claims in feedback from another reviewer as unverified. Flag any you can't confirm instead of carrying them into the copy.
 
-## Open questions resolved during the build
+## Open questions (resolved 2026-10-05)
 
-The first tasks answer these before the adapters depend on them:
-
-1. **Gemini resume.** Gemini CLI 0.24 resumes by list index, not a stable ID. If indexing proves unreliable under concurrent threads, the Gemini adapter replays the full conversation on each call instead.
-2. **Stop and memory.** Whether each CLI persists a partial reply into its session after a kill. Where it does, the adapter compensates (for example, by forking from the prior session) or the UI notes the exception.
-3. **Claude isolation.** Which flag keeps Claude Code from loading `~/.claude` settings and instructions.
-4. **Tool disabling** for Codex and Gemini.
-5. **Codex install.** Codex CLI is not installed on this machine; setup installs it and runs `codex login`.
+1. **Gemini access.** Gemini CLI no longer serves individual accounts; Relay uses Antigravity CLI, which resumes by stable `conversation_id`.
+2. **Stop and memory.** Claude and Codex persist partial turns, so their adapters fork per turn and discard stopped forks. Antigravity drops cancelled turns itself.
+3. **Claude isolation.** `--setting-sources ""` with `--strict-mcp-config`; a probe confirmed no `CLAUDE.md` content reaches the model.
+4. **Tool disabling.** See the adapter list above. Codex and Antigravity still send their tool schemas (about 11k and 2k input tokens per turn); the models follow the Relay prompt regardless.
+5. **Codex install.** Installed and signed in with ChatGPT.
 
 ## Testing
 
