@@ -19,6 +19,7 @@ No free tool does this. Existing multi-model extensions (ChatHub, TabGPT, XPromp
 ### Non-goals (v1)
 
 - Shared draft document (planned for a later version; the data model leaves room for it).
+- Automatic looped routing (planned; see Future work).
 - Per-thread briefs and per-participant system prompts.
 - Sending one message to several participants at once.
 - Mobile access, share links, voice, image generation.
@@ -193,6 +194,27 @@ The first tasks answer these before the adapters depend on them:
 2. **Router and store tests:** a message reaches only its participant; quotes inline in the fixed format; threads round-trip through disk exactly; atomic writes survive a simulated crash.
 3. **Live smoke test (manual, small quota):** per real CLI, send "reply OK", resume, change model, Stop. Run after any CLI upgrade.
 4. **Quality check:** rerun Sam's Codex vs. ChatGPT comparison with the Relay prompt and high effort; confirm replies match ChatGPT's depth.
+
+## Future work
+
+### Automatic looped routing
+
+Sam picks two or more participants and an instruction, such as "revise" for one and "critique" for the other. Relay then routes replies between them without manual forwarding until one of three conditions ends the loop:
+
+- **Convergence:** the critic approves the version, or successive versions stop changing meaningfully.
+- **Stuck loop:** the participants repeat earlier versions or trade the same objections.
+- **Round cap:** a maximum round count Sam sets, to bound quota use.
+
+Sam can stop the loop at any time and resume manual routing from the last message.
+
+v1 keeps this addition cheap:
+
+- The router exposes `send(participantId, text, quotes)` as a plain function, not only an HTTP handler, so a loop controller can call it.
+- Messages can gain an optional `origin: 'manual' | 'loop'` field without a migration, so the timeline can group loop rounds.
+
+### Shared draft
+
+A single document all participants can edit, with highlight-to-ask and per-version attribution.
 
 ## Tech stack
 
