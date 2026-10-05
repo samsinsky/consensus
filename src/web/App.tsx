@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ModelOption, ProviderId, Settings, ThreadSummary } from '../shared/types.js';
 import { api } from './api.js';
+import { SettingsDialog } from './components/SettingsDialog.js';
 import { ThreadsSidebar } from './components/ThreadsSidebar.js';
 import { ThreadView } from './components/ThreadView.js';
 import { useThread } from './useThread.js';
@@ -52,13 +53,9 @@ export function App() {
         )}
       </main>
       {showSettings && models && (
-        <SettingsSlot models={models} onClose={() => { setShowSettings(false); reloadSettings(); }} />
+        <SettingsDialog models={models} onClose={() => { setShowSettings(false); reloadSettings(); }} />
       )}
     </div>
   );
 }
 
-// Replaced by SettingsDialog in Task 12.
-function SettingsSlot(_: { models: Record<ProviderId, ModelOption[]>; onClose: () => void }) {
-  return null;
-}
