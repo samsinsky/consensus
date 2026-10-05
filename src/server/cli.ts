@@ -4,6 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAdapters } from './adapters/index.js';
+import { forceKillAllChildren, killAllChildren } from './adapters/process.js';
 import { createRelayServer } from './http.js';
 import { EventHub } from './hub.js';
 import { makePaths } from './paths.js';
@@ -40,3 +41,18 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`Relay running at ${url}`);
   if (shouldOpen) spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
 });
+
+// Stop every CLI we started, so a killed Relay never leaves them spending quota.
+let shuttingDown = false;
+const shutdown = () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  killAllChildren();
+  server.close();
+  setTimeout(() => {
+    forceKillAllChildren();
+    process.exit(0);
+  }, 1_500);
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

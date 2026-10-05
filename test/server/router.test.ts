@@ -192,3 +192,42 @@ describe('Router', () => {
     await expect(router.send(t.id, { to: 'nobody', text: 'Hi' })).rejects.toMatchObject({ code: 'not_found' });
   });
 });
+
+describe('Router when saving fails', () => {
+  class FlakyStore extends ThreadStore {
+    failNext = 0;
+    override async save(thread: Parameters<ThreadStore['save']>[0]) {
+      if (this.failNext > 0) { this.failNext--; throw new Error('disk full'); }
+      return super.save(thread);
+    }
+  }
+
+  async function setup() {
+    const paths = makePaths(await mkdtemp(join(tmpdir(), 'relay-')));
+    const flaky = new FlakyStore(paths.threads);
+    const c = controllable('claude');
+    const r = new Router({ store: flaky, hub: new EventHub(), paths, adapters: { claude: c.adapter, codex: controllable('codex').adapter, gemini: controllable('gemini').adapter } });
+    const t = await r.createThread();
+    const p = await r.addParticipant(t.id, { provider: 'claude', model: 'opus' });
+    return { flaky, c, r, t, p };
+  }
+
+  it('does not reject done when the final save fails, and frees the participant', async () => {
+    const { flaky, c, r, t, p } = await setup();
+    const { done } = await r.send(t.id, { to: p.id, text: 'Hi' });
+    flaky.failNext = 1;
+    c.last().push({ type: 'done', text: 'Hello' });
+    c.last().end();
+    await expect(done).resolves.toBeUndefined();
+    await expect(r.send(t.id, { to: p.id, text: 'Again' })).resolves.toBeDefined();
+  });
+
+  it('rolls back a send whose first save fails', async () => {
+    const { flaky, c, r, t, p } = await setup();
+    flaky.failNext = 1;
+    await expect(r.send(t.id, { to: p.id, text: 'Hi' })).rejects.toThrow('disk full');
+    expect(c.requests).toHaveLength(0);
+    expect((await r.getThread(t.id))!.messages).toHaveLength(0);
+    await expect(r.send(t.id, { to: p.id, text: 'Again' })).resolves.toBeDefined();
+  });
+});

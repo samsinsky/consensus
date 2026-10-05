@@ -10,6 +10,10 @@ export type FakeScript = {
   stderr?: string;
   exitCode?: number;
   hang?: boolean;
+  ignoreTerm?: boolean;
+  grandchild?: boolean;
+  exitDelayMs?: number;
+  markerFile?: string;
 };
 
 const FAKE = fileURLToPath(new URL('./fake-cli.mjs', import.meta.url));

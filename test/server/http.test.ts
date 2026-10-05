@@ -127,4 +127,19 @@ describe('HTTP API', () => {
     });
     expect(status).toBe(403);
   });
+  it('rejects requests from non-local hosts, foreign origins and non-JSON bodies', async () => {
+    const port = Number(new URL(base).port);
+    const raw = (method: string, path: string, headers: Record<string, string>, body?: string) =>
+      new Promise<number>((resolve) => {
+        const r = request({ host: '127.0.0.1', port, method, path, headers }, (res) => { res.resume(); resolve(res.statusCode!); });
+        if (body) r.write(body);
+        r.end();
+      });
+    expect(await raw('GET', '/api/threads', { host: 'evil.example:4747' })).toBe(403);
+    expect(await raw('POST', '/api/threads', { host: `localhost:${port}`, origin: 'http://evil.example', 'content-type': 'application/json' }, '{}')).toBe(403);
+    expect(await raw('POST', '/api/threads', { host: `localhost:${port}`, 'content-type': 'text/plain' }, '{}')).toBe(415);
+    expect(await raw('POST', '/api/threads', { host: `localhost:${port}`, origin: `http://localhost:5173`, 'content-type': 'application/json' }, '{}')).toBe(200);
+    expect(await raw('GET', '/api/threads', { host: 'localhost:5173' })).toBe(200);
+  });
 });
+

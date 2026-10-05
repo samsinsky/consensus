@@ -22,6 +22,7 @@ type Deps = {
 type Handler = (req: IncomingMessage, res: ServerResponse, params: string[]) => Promise<void>;
 
 const ID = '([\\w-]+)';
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const MAX_BODY = 5 * 1024 * 1024;
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
@@ -70,7 +71,8 @@ export function createRelayServer(deps: Deps): Server {
       const quotes = Array.isArray(body.quotes)
         ? body.quotes.filter((q: any) => typeof q?.text === 'string').map((q: any) => ({ messageId: String(q.messageId ?? ''), text: q.text }))
         : [];
-      const { userMessageId, replyMessageId } = await router.send(id, { to: body.to, text: body.text, quotes });
+      const { userMessageId, replyMessageId, done } = await router.send(id, { to: body.to, text: body.text, quotes });
+      done.catch((e) => console.error('relay: reply failed', e));
       json(res, 202, { userMessageId, replyMessageId });
     }],
     ['POST', re(`/api/threads/${ID}/replies/${ID}/stop`), async (_q, res, [id, rid]) => {
@@ -78,7 +80,8 @@ export function createRelayServer(deps: Deps): Server {
       res.writeHead(204).end();
     }],
     ['POST', re(`/api/threads/${ID}/replies/${ID}/retry`), async (_q, res, [id, rid]) => {
-      const { userMessageId, replyMessageId } = await router.retry(id, rid);
+      const { userMessageId, replyMessageId, done } = await router.retry(id, rid);
+      done.catch((e) => console.error('relay: reply failed', e));
       json(res, 202, { userMessageId, replyMessageId });
     }],
     ['GET', /^\/api\/models$/, async (_q, res) => {
@@ -101,6 +104,9 @@ export function createRelayServer(deps: Deps): Server {
   return createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
+      // Block DNS rebinding and cross-site requests: only local pages may drive the CLIs.
+      const refusal = refuseForeign(req);
+      if (refusal) return json(res, refusal.status, { error: refusal.error });
       for (const [method, pattern, handler] of routes) {
         const m = pattern.exec(url.pathname);
         if (m && req.method === method) return await handler(req, res, m.slice(1));
@@ -117,6 +123,27 @@ export function createRelayServer(deps: Deps): Server {
       json(res, 500, { error: e instanceof Error ? e.message : 'Server error.' });
     }
   });
+}
+
+function hostnameOf(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    return new URL(value.includes('://') ? value : `http://${value}`).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+function refuseForeign(req: IncomingMessage): { status: number; error: string } | undefined {
+  const host = hostnameOf(req.headers.host);
+  if (!host || !LOCAL_HOSTS.has(host)) return { status: 403, error: 'Relay only answers requests addressed to localhost.' };
+  const origin = req.headers.origin;
+  if (origin && !LOCAL_HOSTS.has(hostnameOf(origin) ?? '')) return { status: 403, error: 'Cross-origin requests are not allowed.' };
+  const hasBody = req.method !== 'GET' && req.method !== 'HEAD' && (Number(req.headers['content-length'] ?? 0) > 0 || !!req.headers['transfer-encoding']);
+  if (hasBody && !String(req.headers['content-type'] ?? '').startsWith('application/json')) {
+    return { status: 415, error: 'Send JSON.' };
+  }
+  return undefined;
 }
 
 function re(path: string): RegExp {

@@ -101,7 +101,16 @@ export class Router {
     const controller = new AbortController();
     this.busy.add(p.id);
     this.inflight.set(reply.id, controller);
-    await this.commit(thread);
+    try {
+      await this.commit(thread);
+    } catch (e) {
+      // Nothing reached the CLI yet; undo so the participant is not stuck busy.
+      thread.messages.splice(thread.messages.indexOf(user), 2);
+      this.busy.delete(p.id);
+      this.inflight.delete(reply.id);
+      this.deps.hub.emit(thread.id, { type: 'thread', thread });
+      throw e;
+    }
     const done = this.run(thread, p, reply, composeOutgoing(input.text, quotes), controller);
     return { userMessageId: user.id, replyMessageId: reply.id, done };
   }
@@ -170,7 +179,11 @@ export class Router {
     }
     this.busy.delete(p.id);
     this.inflight.delete(reply.id);
-    await this.commit(thread);
+    try {
+      await this.commit(thread);
+    } catch (e) {
+      console.error('relay: could not save the finished reply', e);
+    }
   }
 
   private async commit(thread: Thread): Promise<void> {
