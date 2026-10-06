@@ -107,14 +107,22 @@ Adding a provider later means writing one adapter.
 ### Router
 
 - Sends each message only to the selected participant.
-- Builds the outgoing text by inlining quotes in a fixed format. The model never learns which provider wrote the quote:
+- Builds the outgoing text by inlining quotes with the task and current state: the original request at the root of the forward chain, the text the forwarded reply was responding to, and the reply itself. Earlier reviewer opinions and Sam's in-between messages stay out, which limits anchoring on apparent consensus. The model never learns which provider wrote the quote:
 
   ```
+  Original request:
+  <request>…</request>
+
+  Text another reviewer was responding to:
+  <context>…</context>
+
   Feedback from another reviewer:
   <quoted>…</quoted>
 
   <Sam's instruction>
   ```
+
+  The router derives each block from the data: the reply's prompt is Sam's last message to that participant before it; the context is that prompt's quotes; the original request is found by following quotes back to a prompt with none. Blocks with nothing to show are omitted. A richer history (Sam's messages along the chain, a "fresh eyes" or "quote only" toggle) is deferred until real use shows the need.
 
 - Passes the participant's session ID, model, and effort to the adapter, streams events to the browser, and writes the result to the store.
 
@@ -224,9 +232,18 @@ v1 keeps this addition cheap:
 - The router exposes `send(participantId, text, quotes)` as a plain function, not only an HTTP handler, so a loop controller can call it.
 - Messages can gain an optional `origin: 'manual' | 'loop'` field without a migration, so the timeline can group loop rounds.
 
-### Shared draft
+### Shared document with comment threads
 
-A single document all participants can edit, with highlight-to-ask and per-version attribution.
+A single document all participants work on, replacing chat history as the "current state". Participants leave comments anchored to passages, reply in threads, and propose edits as suggestions; a thread resolves when its concern is settled. This merges with automatic looped routing: the loop runs until threads resolve, then Sam reviews what remains.
+
+Risks to design for:
+
+- **False agreement.** Models defer to each other, so threads may resolve without the text improving. Guardrails: only the comment's author or Sam resolves; a reviewer restates why its concern is met before resolving; capped rounds; unresolved disagreements escalate to Sam.
+- **Losing the big picture.** Comment-by-comment work becomes line editing; nobody asks whether the piece is right. Counter with document-level threads not anchored to a passage, a structural pass against the brief before line edits each round, an editor-in-chief participant that judges the whole draft and can reopen threads or propose a rewrite, and a blind reader that never sees the comments. Convergence requires a whole-draft check against the brief or Sam's sign-off, not just zero open threads.
+- **Anchor drift.** Comments must follow their passage as text changes, or show clearly as orphaned.
+- **Structured output.** Comments and suggestions need schema-enforced JSON from each CLI; all three expose a JSON schema option, unverified for this use.
+
+Prerequisite: the per-thread brief, so big-picture review has a goal, audience, and constraints to judge against.
 
 ## Tech stack
 
