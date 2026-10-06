@@ -33,4 +33,23 @@ describe('CollapsibleQuote', () => {
   it('treats one very long line as long', () => {
     expect(render('x'.repeat(400)).querySelector('button')).not.toBeNull();
   });
+  it('keeps the toggle in place on screen when collapsing inside a scrolled timeline', () => {
+    const scroller = document.createElement('div');
+    scroller.style.overflowY = 'auto';
+    document.body.appendChild(scroller);
+    let scrollTop = 1000;
+    Object.defineProperty(scroller, 'scrollTop', { get: () => scrollTop, set: (v) => { scrollTop = v; } });
+    const host = document.createElement('div');
+    scroller.appendChild(host);
+    act(() => createRoot(host).render(<CollapsibleQuote text={'1\n2\n3\n4\n5'} />));
+    const button = host.querySelector('button')!;
+    act(() => button.click());
+    // The button sits 500px down before collapsing and would jump to 200px after.
+    const tops = [500, 200];
+    button.getBoundingClientRect = () => ({ top: tops.shift() ?? 200 } as DOMRect);
+    act(() => button.click());
+    expect(button.textContent).toBe('Show more');
+    expect(scrollTop).toBe(700);
+  });
 });
+
