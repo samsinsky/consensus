@@ -27,6 +27,21 @@ export type Participant = {
 
 export type Quote = { messageId: string; text: string };
 
+export type AttachmentKind = 'text' | 'image';
+
+export type Attachment = {
+  id: string;
+  name: string;
+  kind: AttachmentKind;
+  mime: string;
+  size: number;
+  /** Extracted characters, for text and documents. */
+  chars?: number;
+  /** True when extracted text was cut to the character limit. */
+  truncated?: boolean;
+  createdAt: string;
+};
+
 export type ErrorCode =
   | 'not_installed'
   | 'not_logged_in'
@@ -45,6 +60,7 @@ export type UserMessage = {
   to: string;
   text: string;
   quotes: Quote[];
+  attachments?: Attachment[];
   sentAt: string;
   origin?: Origin;
 };

@@ -15,9 +15,11 @@
     "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
+    "mammoth": "^1.13.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",
