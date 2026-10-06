@@ -1,14 +1,28 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import { participantLabel, participantName, replyLabel } from '../../shared/labels.js';
 import type { Message, Quote, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
+import { CollapsibleQuote } from './CollapsibleQuote.js';
 
 type Props = { thread: Thread; message: Message; onForward: (q: Quote) => void };
 
 export function MessageView({ thread, message, onForward }: Props) {
   const body = useRef<HTMLDivElement>(null);
   const [actionError, setActionError] = useState<string>();
+  const [hasSelection, setHasSelection] = useState(false);
+
+  // Offer "Forward selection" only while text inside this reply is highlighted.
+  useEffect(() => {
+    if (message.kind !== 'reply') return;
+    const onChange = () => {
+      const sel = window.getSelection();
+      const el = body.current;
+      setHasSelection(!!sel && !sel.isCollapsed && !!el && el.contains(sel.anchorNode) && el.contains(sel.focusNode));
+    };
+    document.addEventListener('selectionchange', onChange);
+    return () => document.removeEventListener('selectionchange', onChange);
+  }, [message.kind]);
   const label = (id: string) => {
     const p = thread.participants.find((x) => x.id === id);
     return p ? participantLabel(p, thread.participants) : 'Removed participant';
@@ -26,18 +40,17 @@ export function MessageView({ thread, message, onForward }: Props) {
       <div className="msg user">
         <div className="msg-head">You → <span className={`dot ${provider(message.to)}`} /> {label(message.to)}</div>
         {message.quotes.map((q, i) => (
-          <blockquote key={i} className="quote">{q.text}</blockquote>
+          <CollapsibleQuote key={i} text={q.text} />
         ))}
         {message.text && <div className="msg-body plain">{message.text}</div>}
       </div>
     );
   }
 
-  const forward = () => {
-    // Forward only the highlighted part when the selection sits inside this reply.
-    const sel = window.getSelection();
-    const inside = sel && !sel.isCollapsed && body.current?.contains(sel.anchorNode) && body.current.contains(sel.focusNode);
-    onForward({ messageId: message.id, text: inside ? sel!.toString() : message.text });
+  const forwardSelection = () => {
+    const text = window.getSelection()?.toString().trim();
+    if (text) onForward({ messageId: message.id, text });
+    window.getSelection()?.removeAllRanges();
   };
 
   const author = thread.participants.find((x) => x.id === message.from);
@@ -59,9 +72,9 @@ export function MessageView({ thread, message, onForward }: Props) {
       )}
       <div className="msg-actions">
         {message.status === 'streaming' && <button onClick={() => act(() => api.stop(thread.id, message.id))}>Stop</button>}
-        {message.text && (
-          <button onMouseDown={(e) => e.preventDefault()} onClick={forward} title="Highlight text first to forward only part">
-            Forward ▸
+        {hasSelection && (
+          <button onMouseDown={(e) => e.preventDefault()} onClick={forwardSelection} title="Forward only the highlighted text">
+            Forward selection
           </button>
         )}
       </div>

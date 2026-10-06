@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Thread } from '../../src/shared/types.js';
-import { applyEvent, nextActive, paneMessages, streamingReply } from '../../src/web/threadState.js';
+import { applyEvent, autoQuote, nextActive, paneMessages, streamingReply } from '../../src/web/threadState.js';
 
 const base: Thread = {
   id: 't', title: 'T', createdAt: '', updatedAt: '',
@@ -47,5 +47,37 @@ describe('threadState', () => {
     expect(nextActive(base, 'gone')).toBe('b');
     expect(nextActive({ ...base, messages: [] })).toBe('b');
     expect(nextActive({ ...base, participants: [], messages: [] })).toBeUndefined();
+  });
+});
+
+describe('autoQuote', () => {
+  const t: Thread = {
+    ...base,
+    participants: [...base.participants, { id: 'c', provider: 'gemini', model: 'g', promptHash: 'h', createdAt: '' }],
+    messages: [
+      { id: 'ra', kind: 'reply', from: 'a', text: 'Draft from A', model: 'opus', status: 'done', sentAt: '' },
+      { id: 'rc', kind: 'reply', from: 'c', text: 'Half', model: 'g', status: 'streaming', sentAt: '' },
+    ],
+  };
+
+  it('attaches the latest finished reply when sending to someone else', () => {
+    expect(autoQuote(t, 'b', new Set())).toEqual({ messageId: 'ra', text: 'Draft from A' });
+  });
+
+  it('attaches nothing when sending to the participant that replied last', () => {
+    expect(autoQuote(t, 'a', new Set())).toBeUndefined();
+  });
+
+  it('skips a reply the user dismissed', () => {
+    expect(autoQuote(t, 'b', new Set(['ra']))).toBeUndefined();
+  });
+
+  it('ignores replies still streaming, stopped or failed', () => {
+    const only = { ...t, messages: [{ ...t.messages[0], status: 'stopped' as const }, t.messages[1]] };
+    expect(autoQuote(only, 'b', new Set())).toBeUndefined();
+  });
+
+  it('attaches nothing without a target', () => {
+    expect(autoQuote(t, undefined, new Set())).toBeUndefined();
   });
 });

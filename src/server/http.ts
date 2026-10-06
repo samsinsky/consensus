@@ -40,6 +40,12 @@ export function createConsensusServer(deps: Deps): Server {
       if (!thread) throw new RouterError('not_found', 'That thread does not exist.');
       json(res, 200, thread);
     }],
+    ['PATCH', re(`/api/threads/${ID}`), async (req, res, [id]) => {
+      const body = await readJson(req);
+      if (typeof body.title !== 'string') throw new RouterError('invalid', 'Missing title.');
+      await router.renameThread(id, body.title);
+      res.writeHead(204).end();
+    }],
     ['GET', re(`/api/threads/${ID}/events`), async (req, res, [id]) => {
       const thread = await router.getThread(id);
       if (!thread) throw new RouterError('not_found', 'That thread does not exist.');

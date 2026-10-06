@@ -141,5 +141,11 @@ describe('HTTP API', () => {
     expect(await raw('POST', '/api/threads', { host: `localhost:${port}`, origin: `http://localhost:5173`, 'content-type': 'application/json' }, '{}')).toBe(200);
     expect(await raw('GET', '/api/threads', { host: 'localhost:5173' })).toBe(200);
   });
+  it('renames a thread over PATCH', async () => {
+    const thread = (await api('POST', '/api/threads', {})).body as Thread;
+    expect((await api('PATCH', `/api/threads/${thread.id}`, { title: 'Launch email' })).status).toBe(204);
+    expect((await api('GET', `/api/threads/${thread.id}`)).body.title).toBe('Launch email');
+    expect((await api('PATCH', `/api/threads/${thread.id}`, { title: '' })).status).toBe(400);
+  });
 });
 

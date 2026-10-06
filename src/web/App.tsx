@@ -12,6 +12,22 @@ export function App() {
   const [models, setModels] = useState<Record<ProviderId, ModelOption[]>>();
   const [settings, setSettings] = useState<Settings>();
   const [showSettings, setShowSettings] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('consensus.sidebar') === 'collapsed';
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebar = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem('consensus.sidebar', c ? 'open' : 'collapsed');
+      } catch {
+        // Storage can be blocked; the toggle still works for this visit.
+      }
+      return !c;
+    });
   const thread = useThread(activeId);
 
   const refresh = useCallback(() => api.listThreads().then(setThreads), []);
@@ -34,10 +50,12 @@ export function App() {
   };
 
   return (
-    <div className="app">
+    <div className={collapsed ? 'app sidebar-collapsed' : 'app'}>
       <ThreadsSidebar
         threads={threads}
         activeId={activeId}
+        collapsed={collapsed}
+        onToggle={toggleSidebar}
         onSelect={setActiveId}
         onNew={newThread}
         onSettings={() => setShowSettings(true)}

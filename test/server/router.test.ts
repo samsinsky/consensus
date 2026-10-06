@@ -317,3 +317,25 @@ describe('Router forwarding context', () => {
     expect(codex.requests[0].message).toBe('Feedback from another reviewer:\n<quoted>\nOld text\n</quoted>\n\nHm');
   });
 });
+
+describe('Router rename', () => {
+  it('renames a thread, trimming whitespace', async () => {
+    const t = await router.createThread();
+    await router.renameThread(t.id, '  Homepage hero  ');
+    expect((await router.getThread(t.id))!.title).toBe('Homepage hero');
+    expect((await store.get(t.id))!.title).toBe('Homepage hero');
+  });
+
+  it('keeps a chosen name when the first message is sent', async () => {
+    const { t, a } = await threadWithTwo();
+    await router.renameThread(t.id, 'Pricing page');
+    await router.send(t.id, { to: a.id, text: 'Draft something' });
+    expect((await router.getThread(t.id))!.title).toBe('Pricing page');
+  });
+
+  it('rejects empty or overlong names', async () => {
+    const t = await router.createThread();
+    await expect(router.renameThread(t.id, '   ')).rejects.toMatchObject({ code: 'invalid' });
+    await expect(router.renameThread(t.id, 'x'.repeat(121))).rejects.toMatchObject({ code: 'invalid' });
+  });
+});

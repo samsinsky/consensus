@@ -98,6 +98,14 @@ export class Router {
     return thread;
   }
 
+  async renameThread(threadId: string, title: string): Promise<void> {
+    const thread = await this.mustThread(threadId);
+    const name = title.trim();
+    if (!name || name.length > 120) throw new RouterError('invalid', 'Thread names need 1 to 120 characters.');
+    thread.title = name;
+    await this.commit(thread);
+  }
+
   async addParticipant(threadId: string, input: { provider: ProviderId; model: string; effort?: string }): Promise<Participant> {
     const thread = await this.mustThread(threadId);
     const participant: Participant = {

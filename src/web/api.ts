@@ -19,6 +19,7 @@ export type SettingsPayload = { prompt: string; settings: Settings };
 export const api = {
   listThreads: () => call<ThreadSummary[]>('GET', '/api/threads'),
   createThread: () => call<Thread>('POST', '/api/threads', {}),
+  renameThread: (threadId: string, title: string) => call<void>('PATCH', `/api/threads/${threadId}`, { title }),
   addParticipant: (threadId: string, body: { provider: ProviderId; model: string; effort?: string }) =>
     call<Participant>('POST', `/api/threads/${threadId}/participants`, body),
   changeModel: (threadId: string, participantId: string, body: { model: string; effort?: string }) =>
