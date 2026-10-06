@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join, normalize, sep } from 'node:path';
 import { PROVIDER_IDS, type ProviderId, type Settings, type ThreadEvent } from '../shared/types.js';
 import type { ProviderAdapter } from './adapters/types.js';
+import { ATTACHMENT_LIMITS, AttachmentError, type AttachmentStore } from './attachments.js';
 import type { EventHub } from './hub.js';
 import type { Paths } from './paths.js';
 import { readPrompt, writePrompt } from './prompt.js';
@@ -16,6 +17,7 @@ type Deps = {
   hub: EventHub;
   paths: Paths;
   adapters: Record<ProviderId, ProviderAdapter>;
+  attachments?: AttachmentStore;
   webDir?: string;
 };
 
@@ -31,6 +33,7 @@ const TYPES: Record<string, string> = {
 
 export function createConsensusServer(deps: Deps): Server {
   const { router, store, hub, paths, adapters } = deps;
+  const attachments = deps.attachments ?? router.attachments;
 
   const routes: [string, RegExp, Handler][] = [
     ['GET', /^\/api\/threads$/, async (_q, res) => json(res, 200, await store.list())],
@@ -45,6 +48,26 @@ export function createConsensusServer(deps: Deps): Server {
       if (typeof body.title !== 'string') throw new RouterError('invalid', 'Missing title.');
       await router.renameThread(id, body.title);
       res.writeHead(204).end();
+    }],
+    ['DELETE', re(`/api/threads/${ID}`), async (_q, res, [id]) => {
+      await router.deleteThread(id);
+      res.writeHead(204).end();
+    }],
+    ['POST', re(`/api/threads/${ID}/attachments`), async (req, res, [id]) => {
+      if (!(await router.getThread(id))) throw new RouterError('not_found', 'That thread does not exist.');
+      const name = decodeURIComponent(String(req.headers['x-filename'] ?? 'file'));
+      json(res, 200, await attachments.save(id, name, await readRaw(req, ATTACHMENT_LIMITS.fileBytes)));
+    }],
+    ['GET', re(`/api/threads/${ID}/attachments/${ID}`), async (_q, res, [id, aid]) => {
+      const att = await attachments.get(id, aid);
+      // Only images come back; serving an attached HTML file would run it on this origin.
+      if (!att || att.kind !== 'image') throw new RouterError('not_found', 'Not found.');
+      const body = await readFile(attachments.filePath(id, att));
+      res.writeHead(200, {
+        'content-type': att.mime,
+        'x-content-type-options': 'nosniff',
+        'cache-control': 'private, max-age=86400',
+      }).end(body);
     }],
     ['GET', re(`/api/threads/${ID}/events`), async (req, res, [id]) => {
       const thread = await router.getThread(id);
@@ -121,6 +144,7 @@ export function createConsensusServer(deps: Deps): Server {
       await serveStatic(deps.webDir, req, res);
     } catch (e) {
       if (res.headersSent) return void res.end();
+      if (e instanceof AttachmentError) return json(res, e.status, { error: e.message });
       if (e instanceof RouterError) {
         const status = { not_found: 404, busy: 409, invalid: 400 }[e.code];
         return json(res, status, { error: e.message });
@@ -146,7 +170,8 @@ function refuseForeign(req: IncomingMessage): { status: number; error: string } 
   const origin = req.headers.origin;
   if (origin && !LOCAL_HOSTS.has(hostnameOf(origin) ?? '')) return { status: 403, error: 'Cross-origin requests are not allowed.' };
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD' && (Number(req.headers['content-length'] ?? 0) > 0 || !!req.headers['transfer-encoding']);
-  if (hasBody && !String(req.headers['content-type'] ?? '').startsWith('application/json')) {
+  const isUpload = req.headers['x-consensus-upload'] === '1';
+  if (hasBody && !isUpload && !String(req.headers['content-type'] ?? '').startsWith('application/json')) {
     return { status: 415, error: 'Send JSON.' };
   }
   return undefined;
@@ -179,6 +204,17 @@ async function readJson(req: IncomingMessage): Promise<any> {
   } catch {
     throw new RouterError('invalid', 'Request body is not valid JSON.');
   }
+}
+
+async function readRaw(req: IncomingMessage, limit: number): Promise<Buffer> {
+  let size = 0;
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > limit) throw new AttachmentError(413, `Files can be at most ${limit / 1024 / 1024}MB.`);
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 async function serveStatic(webDir: string | undefined, req: IncomingMessage, res: ServerResponse): Promise<void> {

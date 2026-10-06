@@ -65,4 +65,12 @@ describe('ThreadStore', () => {
     expect(await store.get('nope')).toBeUndefined();
     expect(await store.get('../etc/passwd')).toBeUndefined();
   });
+  it('deletes a thread file', async () => {
+    const { store } = await newStore();
+    const t = await store.create();
+    await store.delete(t.id);
+    expect(await store.get(t.id)).toBeUndefined();
+    await expect(store.delete('../nope')).resolves.toBeUndefined();
+  });
 });
+

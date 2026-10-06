@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Thread, ThreadSummary } from '../shared/types.js';
 
@@ -53,6 +53,11 @@ export class ThreadStore {
     const tmp = join(this.dir, `.${thread.id}.${randomUUID()}.tmp`);
     await writeFile(tmp, JSON.stringify(thread, null, 2));
     await rename(tmp, this.file(thread.id));
+  }
+
+  async delete(id: string): Promise<void> {
+    if (!SAFE_ID.test(id)) return;
+    await rm(this.file(id), { force: true });
   }
 
   private file(id: string): string {

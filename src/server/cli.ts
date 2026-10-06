@@ -25,6 +25,10 @@ const store = new ThreadStore(paths.threads);
 const hub = new EventHub();
 const adapters = createAdapters(paths);
 const router = new Router({ store, hub, paths, adapters });
+router.sweepAttachments().then(
+  (n) => n > 0 && console.log(`Removed ${n} unsent attachment${n === 1 ? '' : 's'}.`),
+  (e) => console.error('consensus: attachment cleanup failed', e),
+);
 const webDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
 const server = createConsensusServer({ router, store, hub, paths, adapters, webDir });
 

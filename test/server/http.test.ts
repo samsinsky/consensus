@@ -147,5 +147,51 @@ describe('HTTP API', () => {
     expect((await api('GET', `/api/threads/${thread.id}`)).body.title).toBe('Launch email');
     expect((await api('PATCH', `/api/threads/${thread.id}`, { title: '' })).status).toBe(400);
   });
+  const upload = (threadId: string, name: string, body: Buffer, headers: Record<string, string> = { 'x-consensus-upload': '1' }) =>
+    fetch(`${base}/api/threads/${threadId}/attachments`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), ...headers },
+      body: new Uint8Array(body),
+    });
+
+  it('uploads a file and serves images back', async () => {
+    const thread = (await api('POST', '/api/threads', {})).body as Thread;
+    const res = await upload(thread.id, 'shot.png', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    expect(res.status).toBe(200);
+    const att = await res.json();
+    expect(att).toMatchObject({ name: 'shot.png', kind: 'image' });
+    const img = await fetch(`${base}/api/threads/${thread.id}/attachments/${att.id}`);
+    expect(img.headers.get('content-type')).toBe('image/png');
+    expect(img.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(Buffer.from(await img.arrayBuffer())).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  });
+
+  it('rejects uploads without the upload header', async () => {
+    const thread = (await api('POST', '/api/threads', {})).body as Thread;
+    expect((await upload(thread.id, 'a.txt', Buffer.from('a'), {})).status).toBe(415);
+    expect((await upload(thread.id, 'a.txt', Buffer.from('a'), { 'x-consensus-upload': '0' })).status).toBe(415);
+  });
+
+  it('reports unsupported and empty files with their reason', async () => {
+    const thread = (await api('POST', '/api/threads', {})).body as Thread;
+    const bad = await upload(thread.id, 'run.exe', Buffer.from('x'));
+    expect(bad.status).toBe(415);
+    expect((await bad.json()).error).toContain("Consensus can't read .exe");
+  });
+
+  it('serves images only', async () => {
+    const thread = (await api('POST', '/api/threads', {})).body as Thread;
+    const att = await (await upload(thread.id, 'page.html', Buffer.from('<script>alert(1)</script>'))).json();
+    expect((await fetch(`${base}/api/threads/${thread.id}/attachments/${att.id}`)).status).toBe(404);
+  });
+
+  it('deletes a thread with its files', async () => {
+    const thread = (await api('POST', '/api/threads', {})).body as Thread;
+    const att = await (await upload(thread.id, 'shot.png', Buffer.from([1, 2]))).json();
+    expect((await api('DELETE', `/api/threads/${thread.id}`)).status).toBe(204);
+    expect((await api('GET', `/api/threads/${thread.id}`)).status).toBe(404);
+    expect((await fetch(`${base}/api/threads/${thread.id}/attachments/${att.id}`)).status).toBe(404);
+    expect((await api('GET', '/api/threads')).body).toEqual([]);
+  });
 });
 

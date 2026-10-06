@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { modelLabel } from '../shared/labels.js';
 import type { Origin, Participant, ProviderId, Quote, ReplyMessage, Thread, UserMessage } from '../shared/types.js';
 import type { ProviderAdapter } from './adapters/types.js';
+import { AttachmentStore } from './attachments.js';
 import type { EventHub } from './hub.js';
 import type { Paths } from './paths.js';
 import { snapshotPath, snapshotPrompt } from './prompt.js';
@@ -21,6 +24,7 @@ type Deps = {
   hub: EventHub;
   paths: Paths;
   adapters: Record<ProviderId, ProviderAdapter>;
+  attachments?: AttachmentStore;
 };
 
 const UNTITLED = 'Untitled thread';
@@ -82,9 +86,15 @@ export class Router {
   private inflight = new Map<string, AbortController>();
   private busy = new Set<string>();
 
-  constructor(private deps: Deps) {}
+  private deleted = new Set<string>();
+  readonly attachments: AttachmentStore;
+
+  constructor(private deps: Deps) {
+    this.attachments = deps.attachments ?? new AttachmentStore(deps.paths.threads);
+  }
 
   async getThread(id: string): Promise<Thread | undefined> {
+    if (this.deleted.has(id)) return undefined;
     const cached = this.threads.get(id);
     if (cached) return cached;
     const loaded = await this.deps.store.get(id);
@@ -104,6 +114,29 @@ export class Router {
     if (!name || name.length > 120) throw new RouterError('invalid', 'Thread names need 1 to 120 characters.');
     thread.title = name;
     await this.commit(thread);
+  }
+
+  async deleteThread(threadId: string): Promise<void> {
+    const thread = await this.mustThread(threadId);
+    for (const m of thread.messages) if (m.kind === 'reply') this.inflight.get(m.id)?.abort();
+    // A reply that finishes after this point must not write the thread back.
+    this.deleted.add(threadId);
+    this.threads.delete(threadId);
+    await this.saves.get(threadId);
+    await this.deps.store.delete(threadId);
+    await this.attachments.removeThread(threadId);
+    await rm(join(this.deps.paths.workdir('gemini'), 'attachments', threadId), { recursive: true, force: true });
+  }
+
+  async sweepAttachments(maxAgeMs = 24 * 3600 * 1000): Promise<number> {
+    let removed = 0;
+    for (const summary of await this.deps.store.list()) {
+      const thread = await this.getThread(summary.id);
+      if (!thread) continue;
+      const referenced = new Set(thread.messages.flatMap((m) => (m.kind === 'user' ? (m.attachments ?? []).map((a) => a.id) : [])));
+      removed += await this.attachments.sweep(thread.id, referenced, maxAgeMs);
+    }
+    return removed;
   }
 
   async addParticipant(threadId: string, input: { provider: ProviderId; model: string; effort?: string }): Promise<Participant> {
@@ -242,6 +275,7 @@ export class Router {
   }
 
   private async commit(thread: Thread): Promise<void> {
+    if (this.deleted.has(thread.id)) return;
     const prev = this.saves.get(thread.id) ?? Promise.resolve();
     thread.updatedAt = new Date().toISOString();
     const next = prev.then(() => this.deps.store.save(thread));
