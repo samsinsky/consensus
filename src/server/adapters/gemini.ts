@@ -10,6 +10,7 @@ const FALLBACK_MODELS: ModelOption[] = [
   { id: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash (High)', efforts: [] },
 ];
 const MODELS_TTL_MS = 10 * 60 * 1000;
+const MAX_PROMPT_BYTES = 900_000;
 
 export function agentName(promptHash: string): string {
   return `consensus-${promptHash}`;
@@ -95,7 +96,16 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
   ];
   // Antigravity drops a cancelled turn itself, so resuming in place is safe.
   if (req.sessionId) args.push('--conversation', req.sessionId);
-  args.push(`-p=${message}`);
+  const prompt = `-p=${message}`;
+  // The prompt travels as one argument; past macOS's argument limit spawn fails with E2BIG.
+  if (Buffer.byteLength(prompt) > MAX_PROMPT_BYTES) {
+    yield {
+      type: 'error',
+      error: { code: 'unknown', message: 'Too much text for Gemini in one message (about 900KB at most). Attach fewer or shorter files.' },
+    };
+    return;
+  }
+  args.push(prompt);
 
   let sessionSent = false;
   let noise = '';

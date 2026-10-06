@@ -109,5 +109,11 @@ describe('gemini adapter', () => {
     const args = (await fake.record()).argv;
     expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123');
   });
+  it('refuses a message too long for one command-line argument without starting agy', async () => {
+    const { fake, adapter, req } = setup(OK_RUN);
+    const events = await collect(adapter.send(req({ message: 'é'.repeat(500_000) })));
+    expect(events).toEqual([{ type: 'error', error: { code: 'unknown', message: 'Too much text for Gemini in one message (about 900KB at most). Attach fewer or shorter files.' } }]);
+    await expect(fake.record()).rejects.toThrow();
+  });
 });
 

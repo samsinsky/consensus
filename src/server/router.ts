@@ -188,13 +188,24 @@ export class Router {
     const thread = await this.mustThread(threadId);
     const p = this.mustParticipant(thread, input.to);
     const quotes = input.quotes ?? [];
-    const attachments = await this.resolveAttachments(thread.id, input.attachmentIds ?? []);
-    if (!input.text.trim() && !quotes.length && !attachments.length) {
-      throw new RouterError('invalid', 'Write a message, forward a quote or attach a file.');
-    }
     if (this.busy.has(p.id)) throw new RouterError('busy', 'That participant is still replying.');
-    // Built before anything is recorded, so a missing file leaves the thread untouched.
-    const { message: outgoing, images } = await this.buildOutgoing(thread, input.text, quotes, attachments);
+    // Reserve the participant before any await, so two quick sends cannot both get through.
+    this.busy.add(p.id);
+    let attachments: Attachment[];
+    let outgoing: string;
+    let images: ImageInput[];
+    try {
+      attachments = await this.resolveAttachments(thread.id, input.attachmentIds ?? []);
+      if (!input.text.trim() && !quotes.length && !attachments.length) {
+        throw new RouterError('invalid', 'Write a message, forward a quote or attach a file.');
+      }
+      // Built before anything is recorded, so a missing file leaves the thread untouched.
+      ({ message: outgoing, images } = await this.buildOutgoing(thread, input.text, quotes, attachments));
+      if (this.deleted.has(thread.id)) throw new RouterError('not_found', 'That thread was deleted.');
+    } catch (e) {
+      this.busy.delete(p.id);
+      throw e;
+    }
 
     const now = new Date().toISOString();
     const user: UserMessage = {
@@ -209,7 +220,6 @@ export class Router {
     if (thread.title === UNTITLED) thread.title = deriveTitle(input.text, quotes);
 
     const controller = new AbortController();
-    this.busy.add(p.id);
     this.inflight.set(reply.id, controller);
     try {
       await this.commit(thread);

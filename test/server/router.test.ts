@@ -413,3 +413,31 @@ describe('Router attachments', () => {
     expect((await store.list()).map((s) => s.id)).not.toContain(t.id);
   });
 });
+
+describe('Router send races', () => {
+  it('lets only one of two simultaneous sends to a participant through', async () => {
+    const { t, a } = await threadWithTwo();
+    const results = await Promise.allSettled([
+      router.send(t.id, { to: a.id, text: 'One' }),
+      router.send(t.id, { to: a.id, text: 'Two' }),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find((r) => r.status === 'rejected')).toMatchObject({ reason: { code: 'busy' } });
+    expect(claude.requests).toHaveLength(1);
+  });
+
+  it('abandons a send whose thread is deleted while it is being prepared', async () => {
+    const { t, a } = await threadWithTwo();
+    const doc = await router.attachments.save(t.id, 'brief.md', Buffer.from('Brief'));
+    const pending = router.send(t.id, { to: a.id, text: 'Go', attachmentIds: [doc.id] });
+    await router.deleteThread(t.id);
+    await expect(pending).rejects.toMatchObject({ code: 'not_found' });
+    expect(claude.requests).toHaveLength(0);
+  });
+
+  it('frees the participant when preparing a send fails', async () => {
+    const { t, a } = await threadWithTwo();
+    await expect(router.send(t.id, { to: a.id, text: 'x', attachmentIds: ['missing'] })).rejects.toMatchObject({ code: 'invalid' });
+    await expect(router.send(t.id, { to: a.id, text: 'Now works' })).resolves.toBeDefined();
+  });
+});
