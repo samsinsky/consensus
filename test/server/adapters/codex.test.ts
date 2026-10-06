@@ -49,6 +49,16 @@ describe('codex adapter', () => {
     expect(args.at(-1)).toBe('-');
   });
 
+  it('asks for full-length replies and turns off agent features', async () => {
+    const { fake, adapter, req } = setup(OK_RUN);
+    await collect(adapter.send(req({ sessionId: 'th-old' })));
+    const args = (await fake.record()).argv;
+    expect(args).toContain('model_verbosity="high"');
+    for (const feature of ['multi_agent', 'skill_search', 'plugins', 'apps', 'browser_use', 'computer_use', 'image_generation']) {
+      expect(args).toContain(`features.${feature}=false`);
+    }
+  });
+
   it('forks from the last session when resuming', async () => {
     const { fake, adapter, req } = setup(OK_RUN);
     await collect(adapter.send(req({ sessionId: 'th-old' })));
@@ -95,16 +105,18 @@ describe('codex adapter', () => {
     const home = mkdtempSync(join(tmpdir(), 'codex-home-'));
     writeFileSync(join(home, 'models_cache.json'), JSON.stringify({
       models: [
-        { slug: 'gpt-6-luna', display_name: 'GPT-6-Luna', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }] },
+        { slug: 'gpt-6-luna', display_name: 'GPT-6-Luna', description: 'Fast and affordable model for easier tasks.', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }] },
         { slug: 'codex-auto-review', display_name: 'Codex Auto Review', supported_reasoning_levels: [] },
       ],
     }));
     const { adapter } = setup(OK_RUN, home);
-    expect(await adapter.listModels()).toEqual([{ id: 'gpt-6-luna', label: 'GPT-6-Luna', efforts: ['low', 'high'] }]);
+    expect(await adapter.listModels()).toEqual([
+      { id: 'gpt-6-luna', label: 'GPT-6-Luna', efforts: ['low', 'high'], description: 'Fast and affordable model for easier tasks.' },
+    ]);
   });
 
   it('falls back to a default model list when the cache is missing', async () => {
     const { adapter } = setup(OK_RUN, '/nonexistent');
-    expect((await adapter.listModels())[0].id).toBe('gpt-6-luna');
+    expect((await adapter.listModels())[0].id).toBe('gpt-5.6-terra');
   });
 });

@@ -102,6 +102,8 @@ Verified behavior (2026-10-05, Claude Code 2.1.289, Codex CLI 0.160.1, Antigravi
 | Effort | `--effort` | `-c model_reasoning_effort=` | Baked into the model slug (`gemini-3.1-pro-high`) |
 | Model list | Static aliases (`opus`, `sonnet`, `haiku`) | `~/.codex/models_cache.json` | `agy models` |
 
+ChatGPT through Codex (verified 2026-10-05): with a ChatGPT login, Codex rejects the ChatGPT app's flagship (`gpt-6`) and offers smaller or older models. `gpt-6-luna` is a small model and stays near 220 words on a copy critique; `gpt-5.6-terra` at high effort gives chat-app depth (about 580 words, structured). Codex defaults every model to low verbosity and injects skill and sub-agent instructions, so the adapter sends `model_verbosity="high"` and turns off agent features. ChatGPT defaults to `gpt-5.6-terra` at high effort, and the model picker shows each model's description.
+
 Adding a provider later means writing one adapter.
 
 ### Router

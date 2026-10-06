@@ -6,6 +6,10 @@ import { makePaths } from '../../src/server/paths.js';
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../../src/server/settings.js';
 
 describe('settings', () => {
+  it('defaults ChatGPT to Terra at high effort', () => {
+    expect(DEFAULT_SETTINGS.defaults.codex).toEqual({ model: 'gpt-5.6-terra', effort: 'high' });
+  });
+
   it('returns defaults when no file exists', async () => {
     const paths = makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
     expect(await loadSettings(paths)).toEqual(DEFAULT_SETTINGS);

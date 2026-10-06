@@ -7,8 +7,11 @@ import { runJsonl } from './process.js';
 import { DEFAULT_TIMEOUT_MS, type AdapterEvent, type CliOptions, type ProviderAdapter, type SendRequest } from './types.js';
 
 const FALLBACK_MODELS: ModelOption[] = [
-  { id: 'gpt-6-luna', label: 'GPT-6-Luna', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+  { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
 ];
+
+// Codex's agent features add skill, sub-agent and tool instructions that pull replies toward coding work.
+const DISABLED_FEATURES = ['multi_agent', 'skill_search', 'plugins', 'apps', 'browser_use', 'computer_use', 'image_generation'];
 
 type CodexOptions = CliOptions & { codexHome?: string };
 
@@ -30,6 +33,7 @@ async function listModels(codexHome: string): Promise<ModelOption[]> {
         id: m.slug as string,
         label: (m.display_name as string) ?? m.slug,
         efforts: ((m.supported_reasoning_levels ?? []) as { effort: string }[]).map((l) => l.effort),
+        ...(typeof m.description === 'string' ? { description: m.description as string } : {}),
       }));
     return options.length ? options : FALLBACK_MODELS;
   } catch {
@@ -46,6 +50,9 @@ async function* send(opts: CodexOptions, req: SendRequest): AsyncGenerator<Adapt
     '-m', req.model,
     '-c', `model_instructions_file=${JSON.stringify(req.promptPath)}`,
     '-c', 'sandbox_mode="read-only"',
+    // Codex defaults every model to low verbosity, which suits a terminal, not prose.
+    '-c', 'model_verbosity="high"',
+    ...DISABLED_FEATURES.flatMap((f) => ['-c', `features.${f}=false`]),
   ];
   if (req.effort) common.push('-c', `model_reasoning_effort=${JSON.stringify(req.effort)}`);
   // Fork every turn: a stopped turn lands in a fork we never record.
