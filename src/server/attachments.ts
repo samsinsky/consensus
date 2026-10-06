@@ -3,26 +3,11 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import mammoth from 'mammoth';
 import { extractText as extractPdfText, getDocumentProxy } from 'unpdf';
-import type { Attachment, AttachmentKind } from '../shared/types.js';
+import { ATTACHMENT_LIMITS, checkFile, DOC_TYPES, extensionOf, IMAGE_TYPES, kindOf, TEXT_TYPES } from '../shared/attachmentRules.js';
+import type { Attachment } from '../shared/types.js';
 
-export const ATTACHMENT_LIMITS = {
-  fileBytes: 20 * 1024 * 1024,
-  imageBytes: 5 * 1024 * 1024,
-  chars: 100_000,
-  perMessage: 10,
-};
+export { ATTACHMENT_LIMITS };
 
-const TEXT_TYPES: Record<string, string> = {
-  '.txt': 'text/plain', '.md': 'text/markdown', '.csv': 'text/csv',
-  '.json': 'application/json', '.html': 'text/html', '.htm': 'text/html',
-};
-const DOC_TYPES: Record<string, string> = {
-  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.pdf': 'application/pdf',
-};
-const IMAGE_TYPES: Record<string, string> = {
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
-};
 const SAFE_ID = /^[\w-]+$/;
 
 export class AttachmentError extends Error {
@@ -46,13 +31,10 @@ export class AttachmentStore {
     if (!SAFE_ID.test(threadId)) throw new AttachmentError(400, 'Unknown thread.');
     // Keep only the base name for display; the file itself is stored under a fixed name.
     const name = rawName.split(/[\\/]/).pop()!.trim() || 'file';
-    const ext = extname(name).toLowerCase();
-    const kind: AttachmentKind | undefined = IMAGE_TYPES[ext] ? 'image' : TEXT_TYPES[ext] || DOC_TYPES[ext] ? 'text' : undefined;
-    if (!kind) {
-      throw new AttachmentError(415, `Consensus can't read ${ext || 'files without an extension'}. Attach text, Word, PDF or image files.`);
-    }
-    const limit = kind === 'image' ? ATTACHMENT_LIMITS.imageBytes : ATTACHMENT_LIMITS.fileBytes;
-    if (data.length > limit) throw new AttachmentError(413, `${name} is larger than ${limit / 1024 / 1024}MB.`);
+    const ext = extensionOf(name);
+    const kind = kindOf(ext);
+    const problem = checkFile(name, data.length);
+    if (problem || !kind) throw new AttachmentError(kind ? 413 : 415, problem ?? 'Unsupported file.');
 
     const att: Attachment = {
       id: randomUUID(), name, kind, mime: IMAGE_TYPES[ext] ?? TEXT_TYPES[ext] ?? DOC_TYPES[ext],

@@ -28,11 +28,12 @@ export function Composer({ thread, models, defaults, target, lockTarget, onTarge
   const [sending, setSending] = useState(false);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const box = useRef<HTMLTextAreaElement>(null);
-  const { files, add, remove: removeFile, clear } = useAttachments(thread.id);
+  const { files, add, remove: removeFile, removeKeys } = useAttachments(thread.id);
   const [dragging, setDragging] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
   const uploading = files.some((f) => f.status === 'uploading');
-  const ready = files.filter((f) => f.status === 'ready' && f.attachment).map((f) => f.attachment!);
+  const readyFiles = files.filter((f) => f.status === 'ready' && f.attachment);
+  const ready = readyFiles.map((f) => f.attachment!);
   const running = target ? streamingReply(thread, target) : undefined;
   const lockedParticipant = thread.participants.find((p) => p.id === target);
   const auto = quotes.length ? undefined : autoQuote(thread, target, dismissed);
@@ -56,11 +57,12 @@ export function Composer({ thread, models, defaults, target, lockTarget, onTarge
     if (!canSend || !target) return;
     setSending(true);
     setError(undefined);
+    const sentKeys = readyFiles.map((f) => f.key);
     try {
       await api.send(thread.id, { to: target, text, quotes: outgoing, attachmentIds: ready.map((a) => a.id) });
       setText('');
       setQuotes([]);
-      clear();
+      removeKeys(sentKeys);
     } catch (e) {
       setError((e as Error).message);
     } finally {

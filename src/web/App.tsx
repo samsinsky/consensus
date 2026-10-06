@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ModelOption, ProviderId, Settings, ThreadSummary } from '../shared/types.js';
 import { api } from './api.js';
+import { guardFileDrops } from './dropGuard.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
 import { ThreadsSidebar } from './components/ThreadsSidebar.js';
 import { ThreadView } from './components/ThreadView.js';
@@ -32,6 +33,8 @@ export function App() {
 
   const refresh = useCallback(() => api.listThreads().then(setThreads), []);
   const reloadSettings = useCallback(() => api.getSettings().then((s) => setSettings(s.settings)), []);
+
+  useEffect(() => guardFileDrops(window), []);
 
   useEffect(() => {
     refresh();
