@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import { participantLabel, participantName, replyLabel } from '../../shared/labels.js';
 import type { Message, Quote, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
+import { AttachmentChip } from './AttachmentChip.js';
 import { CollapsibleQuote } from './CollapsibleQuote.js';
 
 type Props = { thread: Thread; message: Message; onForward: (q: Quote) => void };
@@ -42,6 +43,13 @@ export function MessageView({ thread, message, onForward }: Props) {
         {message.quotes.map((q, i) => (
           <CollapsibleQuote key={i} text={q.text} />
         ))}
+        {message.attachments?.length ? (
+          <div className="att-row">
+            {message.attachments.map((a) => (
+              <AttachmentChip key={a.id} threadId={thread.id} name={a.name} size={a.size} attachment={a} />
+            ))}
+          </div>
+        ) : null}
         {message.text && <div className="msg-body plain">{message.text}</div>}
       </div>
     );

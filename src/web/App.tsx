@@ -62,7 +62,7 @@ export function App() {
       />
       <main className="main">
         {thread && models && settings ? (
-          <ThreadView key={thread.id} thread={thread} models={models} defaults={settings.defaults} />
+          <ThreadView key={thread.id} thread={thread} models={models} defaults={settings.defaults} onDeleted={() => { setActiveId(undefined); refresh(); }} />
         ) : (
           <div className="empty">
             <p>Pick a thread or start a new one.</p>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { participantLabel } from '../../shared/labels.js';
 import type { ModelOption, ProviderDefaults, ProviderId, Quote, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
@@ -10,9 +10,10 @@ type Props = {
   thread: Thread;
   models: Record<ProviderId, ModelOption[]>;
   defaults: Record<ProviderId, ProviderDefaults>;
+  onDeleted: () => void;
 };
 
-export function ThreadView({ thread, models, defaults }: Props) {
+export function ThreadView({ thread, models, defaults, onDeleted }: Props) {
   const [view, setView] = useState<'timeline' | 'panes'>('timeline');
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [active, setActive] = useState<string | undefined>(() => nextActive(thread));
@@ -27,12 +28,14 @@ export function ThreadView({ thread, models, defaults }: Props) {
       else next.add(id);
       return next;
     });
-  const composer = (target: string | undefined, lock: boolean) => (
+  const composer = (target: string | undefined, lock: boolean, list: ReactNode) => (
     <Composer
       thread={thread} models={models} defaults={defaults}
       target={target} lockTarget={lock} onTargetChange={setActive}
       quotes={quotes} setQuotes={setQuotes}
-    />
+    >
+      {list}
+    </Composer>
   );
   const shown = thread.participants.filter((p) => !hidden.has(p.id));
 
@@ -44,6 +47,7 @@ export function ThreadView({ thread, models, defaults }: Props) {
           <button className={view === 'timeline' ? 'on' : ''} onClick={() => setView('timeline')}>Timeline</button>
           <button className={view === 'panes' ? 'on' : ''} onClick={() => setView('panes')} disabled={!thread.participants.length}>Panes</button>
         </div>
+        <DeleteThread threadId={thread.id} onDeleted={onDeleted} />
       </header>
       {view === 'panes' && (
         <div className="pane-picker">
@@ -57,16 +61,14 @@ export function ThreadView({ thread, models, defaults }: Props) {
       )}
       {view === 'timeline' ? (
         <>
-          <MessageList thread={thread} messages={thread.messages} onForward={forward} />
-          {composer(active, false)}
+          {composer(active, false, <MessageList thread={thread} messages={thread.messages} onForward={forward} />)}
         </>
       ) : (
         <div className="panes">
           {shown.map((p) => (
             <section key={p.id} className="pane">
               <h2><span className={`dot ${p.provider}`} /> {participantLabel(p, thread.participants)}</h2>
-              <MessageList thread={thread} messages={paneMessages(thread, p.id)} onForward={forward} />
-              {composer(p.id, true)}
+              {composer(p.id, true, <MessageList thread={thread} messages={paneMessages(thread, p.id)} onForward={forward} />)}
             </section>
           ))}
           {!shown.length && <p className="empty">Tick a participant to show its pane.</p>}
@@ -118,5 +120,19 @@ function ThreadTitle({ thread }: { thread: Thread }) {
       />
       {error && <span className="error-inline">{error}</span>}
     </div>
+  );
+}
+
+function DeleteThread({ threadId, onDeleted }: { threadId: string; onDeleted: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string>();
+  if (!confirming) return <button className="ghost" onClick={() => setConfirming(true)}>Delete</button>;
+  return (
+    <span className="confirm">
+      Delete this thread and its files?
+      <button className="danger" onClick={() => api.deleteThread(threadId).then(onDeleted, (e: Error) => setError(e.message))}>Delete</button>
+      <button onClick={() => setConfirming(false)}>Cancel</button>
+      {error && <span className="error-inline">{error}</span>}
+    </span>
   );
 }
