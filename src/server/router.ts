@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { modelLabel } from '../shared/labels.js';
-import type { Origin, Participant, ProviderId, Quote, ReplyMessage, Thread, UserMessage } from '../shared/types.js';
-import type { ProviderAdapter } from './adapters/types.js';
-import { AttachmentStore } from './attachments.js';
+import type { Attachment, Origin, Participant, ProviderId, Quote, ReplyMessage, Thread, UserMessage } from '../shared/types.js';
+import type { ImageInput, ProviderAdapter } from './adapters/types.js';
+import { ATTACHMENT_LIMITS, AttachmentStore, truncationNote } from './attachments.js';
 import type { EventHub } from './hub.js';
 import type { Paths } from './paths.js';
 import { snapshotPath, snapshotPrompt } from './prompt.js';
@@ -16,7 +16,7 @@ export class RouterError extends Error {
   }
 }
 
-export type SendInput = { to: string; text: string; quotes?: Quote[]; origin?: Origin };
+export type SendInput = { to: string; text: string; quotes?: Quote[]; attachmentIds?: string[]; origin?: Origin };
 export type SendResult = { userMessageId: string; replyMessageId: string; done: Promise<void> };
 
 type Deps = {
@@ -30,18 +30,33 @@ type Deps = {
 const UNTITLED = 'Untitled thread';
 
 /** Task plus current state for forwarded quotes; contexts line up with quotes by index. */
-export type ForwardContext = { originalRequest?: string; contexts: (string | undefined)[] };
+export type ForwardContext = {
+  originalRequest?: string;
+  originalAttachments?: Attachment[];
+  /** Rendered text blocks for originalAttachments. */
+  originalBlocks?: string[];
+  contexts: (string | undefined)[];
+};
 
-export function composeOutgoing(text: string, quotes: Quote[], ctx: ForwardContext = { contexts: [] }): string {
-  if (!quotes.length) return text;
+export function attachmentBlock(att: Attachment, text: string): string {
+  const note = att.truncated ? `\n${truncationNote()}` : '';
+  return `<attachment name="${att.name.replace(/"/g, "'")}">\n${text}${note}\n</attachment>`;
+}
+
+export function composeOutgoing(text: string, quotes: Quote[], ctx: ForwardContext = { contexts: [] }, attachmentBlocks: string[] = []): string {
   const blocks: string[] = [];
-  if (ctx.originalRequest) blocks.push(`Original request:\n<request>\n${ctx.originalRequest}\n</request>`);
-  quotes.forEach((q, i) => {
-    const context = ctx.contexts[i];
-    if (context) blocks.push(`Text another reviewer was responding to:\n<context>\n${context}\n</context>`);
-    blocks.push(`Feedback from another reviewer:\n<quoted>\n${q.text}\n</quoted>`);
-  });
-  return [...blocks, text].join('\n\n');
+  if (quotes.length) {
+    if (ctx.originalRequest) blocks.push(`Original request:\n<request>\n${ctx.originalRequest}\n</request>`);
+    blocks.push(...(ctx.originalBlocks ?? []));
+    quotes.forEach((q, i) => {
+      const context = ctx.contexts[i];
+      if (context) blocks.push(`Text another reviewer was responding to:\n<context>\n${context}\n</context>`);
+      blocks.push(`Feedback from another reviewer:\n<quoted>\n${q.text}\n</quoted>`);
+    });
+  }
+  blocks.push(...attachmentBlocks);
+  if (!blocks.length) return text;
+  return [...blocks, text].filter(Boolean).join('\n\n');
 }
 
 /** Sam's message that produced a reply: his last message to that participant before it. */
@@ -57,24 +72,24 @@ function promptOf(thread: Thread, replyId: string): UserMessage | undefined {
 
 /** Derives the original request and each quote's context, leaving earlier opinions out. */
 export function forwardContext(thread: Thread, quotes: Quote[]): ForwardContext {
-  let originalRequest: string | undefined;
+  let root: UserMessage | undefined;
   const contexts = quotes.map((q) => {
     const prompt = promptOf(thread, q.messageId);
     if (!prompt) return undefined;
-    originalRequest ??= rootRequest(thread, prompt);
+    root ??= rootPrompt(thread, prompt);
     const context = prompt.quotes.map((x) => x.text).join('\n\n');
     return context || undefined;
   });
-  return { originalRequest, contexts };
+  return { originalRequest: root?.text.trim() || undefined, originalAttachments: root?.attachments ?? [], contexts };
 }
 
-function rootRequest(thread: Thread, prompt: UserMessage): string | undefined {
+function rootPrompt(thread: Thread, prompt: UserMessage): UserMessage | undefined {
   const seen = new Set<string>();
   let current: UserMessage | undefined = prompt;
   while (current && !seen.has(current.id)) {
     seen.add(current.id);
     const parent: UserMessage | undefined = current.quotes.length ? promptOf(thread, current.quotes[0].messageId) : undefined;
-    if (!parent) return current.text.trim() || undefined;
+    if (!parent) return current;
     current = parent;
   }
   return undefined;
@@ -173,11 +188,19 @@ export class Router {
     const thread = await this.mustThread(threadId);
     const p = this.mustParticipant(thread, input.to);
     const quotes = input.quotes ?? [];
-    if (!input.text.trim() && !quotes.length) throw new RouterError('invalid', 'Write a message or forward a quote.');
+    const attachments = await this.resolveAttachments(thread.id, input.attachmentIds ?? []);
+    if (!input.text.trim() && !quotes.length && !attachments.length) {
+      throw new RouterError('invalid', 'Write a message, forward a quote or attach a file.');
+    }
     if (this.busy.has(p.id)) throw new RouterError('busy', 'That participant is still replying.');
+    // Built before anything is recorded, so a missing file leaves the thread untouched.
+    const { message: outgoing, images } = await this.buildOutgoing(thread, input.text, quotes, attachments);
 
     const now = new Date().toISOString();
-    const user: UserMessage = { id: randomUUID(), kind: 'user', to: p.id, text: input.text, quotes, sentAt: now, origin: input.origin };
+    const user: UserMessage = {
+      id: randomUUID(), kind: 'user', to: p.id, text: input.text, quotes,
+      attachments: attachments.length ? attachments : undefined, sentAt: now, origin: input.origin,
+    };
     const reply: ReplyMessage = {
       id: randomUUID(), kind: 'reply', from: p.id, text: '', model: p.model, effort: p.effort,
       status: 'streaming', sentAt: now, origin: input.origin,
@@ -198,8 +221,7 @@ export class Router {
       this.deps.hub.emit(thread.id, { type: 'thread', thread });
       throw e;
     }
-    const outgoing = composeOutgoing(input.text, quotes, forwardContext(thread, quotes));
-    const done = this.run(thread, p, reply, outgoing, controller);
+    const done = this.run(thread, p, reply, outgoing, images, controller);
     return { userMessageId: user.id, replyMessageId: reply.id, done };
   }
 
@@ -220,10 +242,10 @@ export class Router {
       .reverse()
       .find((m): m is UserMessage => m.kind === 'user' && m.to === reply.from);
     if (!user) throw new RouterError('not_found', 'Could not find the message to retry.');
-    return this.send(threadId, { to: user.to, text: user.text, quotes: user.quotes });
+    return this.send(threadId, { to: user.to, text: user.text, quotes: user.quotes, attachmentIds: user.attachments?.map((x) => x.id) });
   }
 
-  private async run(thread: Thread, p: Participant, reply: ReplyMessage, message: string, controller: AbortController): Promise<void> {
+  private async run(thread: Thread, p: Participant, reply: ReplyMessage, message: string, images: ImageInput[], controller: AbortController): Promise<void> {
     const adapter = this.deps.adapters[p.provider];
     let pendingSession: string | undefined;
     let finished = false;
@@ -231,6 +253,7 @@ export class Router {
       for await (const ev of adapter.send({
         sessionId: p.sessionId, message, model: p.model, effort: p.effort,
         promptHash: p.promptHash, promptPath: snapshotPath(this.deps.paths, p.promptHash),
+        images: images.length ? images : undefined,
         signal: controller.signal,
       })) {
         if (ev.type === 'session') {
@@ -272,6 +295,37 @@ export class Router {
     } catch (e) {
       console.error('consensus: could not save the finished reply', e);
     }
+  }
+
+  private async resolveAttachments(threadId: string, ids: string[]): Promise<Attachment[]> {
+    if (ids.length > ATTACHMENT_LIMITS.perMessage) {
+      throw new RouterError('invalid', `Attach at most ${ATTACHMENT_LIMITS.perMessage} files per message.`);
+    }
+    const out: Attachment[] = [];
+    for (const id of ids) {
+      const att = await this.attachments.get(threadId, id);
+      if (!att) throw new RouterError('invalid', 'An attachment is missing. Attach the file again.');
+      out.push(att);
+    }
+    return out;
+  }
+
+  private async buildOutgoing(thread: Thread, text: string, quotes: Quote[], attachments: Attachment[]): Promise<{ message: string; images: ImageInput[] }> {
+    const ctx = forwardContext(thread, quotes);
+    const original = quotes.length ? ctx.originalAttachments ?? [] : [];
+    const render = async (list: Attachment[]) => {
+      try {
+        return await Promise.all(list.filter((a) => a.kind === 'text').map(async (a) => attachmentBlock(a, await this.attachments.text(thread.id, a))));
+      } catch {
+        throw new RouterError('invalid', 'An attached file is missing from disk. Attach it again.');
+      }
+    };
+    const message = composeOutgoing(text, quotes, { ...ctx, originalBlocks: await render(original) }, await render(attachments));
+    const seen = new Set<string>();
+    const images = [...original, ...attachments]
+      .filter((a) => a.kind === 'image' && !seen.has(a.id) && !!seen.add(a.id))
+      .map((a) => ({ id: a.id, name: a.name, mime: a.mime, path: this.attachments.filePath(thread.id, a), threadId: thread.id }));
+    return { message, images };
   }
 
   private async commit(thread: Thread): Promise<void> {

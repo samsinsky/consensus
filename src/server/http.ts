@@ -100,7 +100,8 @@ export function createConsensusServer(deps: Deps): Server {
       const quotes = Array.isArray(body.quotes)
         ? body.quotes.filter((q: any) => typeof q?.text === 'string').map((q: any) => ({ messageId: String(q.messageId ?? ''), text: q.text }))
         : [];
-      const { userMessageId, replyMessageId, done } = await router.send(id, { to: body.to, text: body.text, quotes });
+      const attachmentIds = Array.isArray(body.attachmentIds) ? body.attachmentIds.filter((x: unknown) => typeof x === 'string') : [];
+      const { userMessageId, replyMessageId, done } = await router.send(id, { to: body.to, text: body.text, quotes, attachmentIds });
       done.catch((e) => console.error('consensus: reply failed', e));
       json(res, 202, { userMessageId, replyMessageId });
     }],

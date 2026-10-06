@@ -339,3 +339,77 @@ describe('Router rename', () => {
     await expect(router.renameThread(t.id, 'x'.repeat(121))).rejects.toMatchObject({ code: 'invalid' });
   });
 });
+
+describe('Router attachments', () => {
+  it('inlines document text before the message and passes images', async () => {
+    const { t, a } = await threadWithTwo();
+    const doc = await router.attachments.save(t.id, 'brief.md', Buffer.from('Audience: CFOs'));
+    const img = await router.attachments.save(t.id, 'shot.png', Buffer.from([1, 2, 3]));
+    await router.send(t.id, { to: a.id, text: 'Draft a headline', attachmentIds: [doc.id, img.id] });
+    expect(claude.requests[0].message).toBe('<attachment name="brief.md">\nAudience: CFOs\n</attachment>\n\nDraft a headline');
+    expect(claude.requests[0].images).toEqual([
+      { id: img.id, name: 'shot.png', mime: 'image/png', path: router.attachments.filePath(t.id, img), threadId: t.id },
+    ]);
+    const sent = (await router.getThread(t.id))!.messages[0];
+    expect(sent.kind === 'user' && sent.attachments?.map((x) => x.name)).toEqual(['brief.md', 'shot.png']);
+  });
+
+  it('notes when a document was cut', async () => {
+    const { t, a } = await threadWithTwo();
+    const doc = await router.attachments.save(t.id, 'long.txt', Buffer.from('a'.repeat(100_010)));
+    await router.send(t.id, { to: a.id, text: 'Summarize', attachmentIds: [doc.id] });
+    expect(claude.requests[0].message).toContain('\n[Truncated: only the first 100,000 characters are included.]\n</attachment>');
+  });
+
+  it('sends attachments with no text and refuses unknown or too many', async () => {
+    const { t, a, b } = await threadWithTwo();
+    const doc = await router.attachments.save(t.id, 'brief.md', Buffer.from('Brief'));
+    await expect(router.send(t.id, { to: a.id, text: '', attachmentIds: [doc.id] })).resolves.toBeDefined();
+    expect(claude.requests[0].message).toBe('<attachment name="brief.md">\nBrief\n</attachment>');
+    await expect(router.send(t.id, { to: b.id, text: 'x', attachmentIds: ['missing'] })).rejects.toMatchObject({ code: 'invalid' });
+    await expect(router.send(t.id, { to: b.id, text: 'x', attachmentIds: Array(11).fill(doc.id) })).rejects.toMatchObject({ code: 'invalid' });
+  });
+
+  it("forwards the original request's attachments, not later ones", async () => {
+    const { t, a, b } = await threadWithTwo();
+    const brief = await router.attachments.save(t.id, 'brief.md', Buffer.from('Audience: CFOs'));
+    const logo = await router.attachments.save(t.id, 'logo.png', Buffer.from([1]));
+    const s1 = await router.send(t.id, { to: a.id, text: 'Write a headline', attachmentIds: [brief.id, logo.id] });
+    claude.last().push({ type: 'done', text: 'Kitchens that run themselves' });
+    claude.last().end();
+    await s1.done;
+    await router.send(t.id, { to: b.id, text: 'Critique', quotes: [{ messageId: s1.replyMessageId, text: 'Kitchens that run themselves' }] });
+    expect(codex.requests[0].message).toBe(
+      'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+        '<attachment name="brief.md">\nAudience: CFOs\n</attachment>\n\n' +
+        'Feedback from another reviewer:\n<quoted>\nKitchens that run themselves\n</quoted>\n\n' +
+        'Critique',
+    );
+    expect(codex.requests[0].images?.map((i) => i.id)).toEqual([logo.id]);
+  });
+
+  it('resends attachments on retry from a fresh router', async () => {
+    const { t, a } = await threadWithTwo();
+    const doc = await router.attachments.save(t.id, 'brief.md', Buffer.from('Brief'));
+    const s1 = await router.send(t.id, { to: a.id, text: 'Go', attachmentIds: [doc.id] });
+    claude.last().push({ type: 'error', error: { code: 'unknown', message: 'x' } });
+    claude.last().end();
+    await s1.done;
+    const fresh = new Router({ store, hub, paths: (router as any).deps.paths, adapters: { claude: claude.adapter, codex: codex.adapter, gemini: controllable('gemini').adapter } });
+    await fresh.retry(t.id, s1.replyMessageId);
+    expect(claude.requests.at(-1)!.message).toBe(claude.requests[0].message);
+  });
+
+  it('deletes a thread mid-reply without it coming back', async () => {
+    const { t, a } = await threadWithTwo();
+    await router.attachments.save(t.id, 'brief.md', Buffer.from('Brief'));
+    const s1 = await router.send(t.id, { to: a.id, text: 'Long one' });
+    claude.last().push({ type: 'delta', text: 'Partial' });
+    await flush();
+    await router.deleteThread(t.id);
+    await s1.done;
+    expect(await store.get(t.id)).toBeUndefined();
+    expect(await router.getThread(t.id)).toBeUndefined();
+    expect((await store.list()).map((s) => s.id)).not.toContain(t.id);
+  });
+});

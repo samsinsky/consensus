@@ -1,5 +1,7 @@
 import type { AdapterError, ModelOption, ProviderId } from '../../shared/types.js';
 
+export type ImageInput = { id: string; name: string; mime: string; path: string; threadId: string };
+
 export type SendRequest = {
   /** Last completed session; absent on a participant's first message. */
   sessionId?: string;
@@ -9,6 +11,8 @@ export type SendRequest = {
   effort?: string;
   promptHash: string;
   promptPath: string;
+  /** Images for this turn; text attachments are already inlined in message. */
+  images?: ImageInput[];
   signal: AbortSignal;
 };
 
