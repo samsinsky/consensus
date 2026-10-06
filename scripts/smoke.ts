@@ -1,9 +1,10 @@
 // Live check against the real CLIs. Uses a little quota on each plan.
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { crc32, deflateSync } from 'node:zlib';
 import { createAdapters } from '../src/server/adapters/index.js';
-import type { AdapterEvent, ProviderAdapter } from '../src/server/adapters/types.js';
+import type { AdapterEvent, ImageInput, ProviderAdapter } from '../src/server/adapters/types.js';
 import { makePaths } from '../src/server/paths.js';
 import { snapshotPath, snapshotPrompt, writePrompt } from '../src/server/prompt.js';
 import type { ProviderId } from '../src/shared/types.js';
@@ -17,7 +18,7 @@ const CHEAP: Record<ProviderId, { model: string; effort?: string; switchTo: stri
 type Outcome = { session?: string; text: string; deltas: number; done: boolean; error?: string };
 
 async function run(adapter: ProviderAdapter, base: { promptHash: string; promptPath: string }, opts: {
-  message: string; model: string; effort?: string; sessionId?: string; abortAfterDelta?: boolean;
+  message: string; model: string; effort?: string; sessionId?: string; abortAfterDelta?: boolean; images?: ImageInput[];
 }): Promise<Outcome> {
   const ac = new AbortController();
   const out: Outcome = { text: '', deltas: 0, done: false };
@@ -43,6 +44,30 @@ await writePrompt(paths, 'You are a terse test assistant. Follow instructions ex
 const promptHash = await snapshotPrompt(paths);
 const base = { promptHash, promptPath: snapshotPath(paths, promptHash) };
 const adapters = createAdapters(paths);
+
+function bluePng(): Buffer {
+  const size = 64;
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(size * 3, Buffer.from([0x10, 0x30, 0xd0]))]);
+  const raw = Buffer.concat(Array.from({ length: size }, () => row));
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+// A neutral file name, so a model cannot guess the color from it.
+const imagePath = join(paths.home, 'a7.png');
+await writeFile(imagePath, bluePng());
+const image: ImageInput = { id: 'a7', name: 'a7.png', mime: 'image/png', path: imagePath, threadId: 'smoke' };
 let failures = 0;
 
 const check = (name: string, ok: boolean, detail: string) => {
@@ -67,6 +92,9 @@ for (const id of (only ? [only] : (['claude', 'codex', 'gemini'] as ProviderId[]
 
   const after = await run(a, base, { message: 'Have you written the word ZEBRA anywhere in this conversation? Answer only yes or no.', model: c.model, effort: c.effort, sessionId: good });
   check(`${id} stopped turn not remembered`, after.done && /\bno\b/i.test(after.text), after.error ?? after.text);
+
+  const seen = await run(a, base, { message: 'What single color fills the attached image? One word.', model: c.model, effort: c.effort, images: [image] });
+  check(`${id} image`, seen.done && /blue/i.test(seen.text), seen.error ?? seen.text);
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');
