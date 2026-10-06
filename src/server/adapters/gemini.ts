@@ -1,9 +1,9 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 import type { ModelOption } from '../../shared/types.js';
 import { classifyError } from './errors.js';
 import { runJsonl } from './process.js';
-import { DEFAULT_TIMEOUT_MS, type AdapterEvent, type CliOptions, type ProviderAdapter, type SendRequest } from './types.js';
+import { DEFAULT_TIMEOUT_MS, type AdapterEvent, type CliOptions, type ImageInput, type ProviderAdapter, type SendRequest } from './types.js';
 
 const FALLBACK_MODELS: ModelOption[] = [
   { id: 'gemini-3.1-pro-high', label: 'Gemini 3.1 Pro (High)', efforts: [] },
@@ -48,8 +48,8 @@ async function listModels(opts: CliOptions): Promise<ModelOption[]> {
 }
 
 /** Antigravity has no system-prompt flag; a custom agent's body becomes its system prompt. */
-async function ensureAgent(workdir: string, req: SendRequest): Promise<string> {
-  const name = agentName(req.promptHash);
+async function ensureAgent(workdir: string, req: SendRequest, viewer: boolean): Promise<string> {
+  const name = viewer ? `${agentName(req.promptHash)}-viewer` : agentName(req.promptHash);
   const dir = join(workdir, '.agents', 'agents');
   const file = join(dir, `${name}.md`);
   try {
@@ -57,14 +57,34 @@ async function ensureAgent(workdir: string, req: SendRequest): Promise<string> {
   } catch {
     await mkdir(dir, { recursive: true });
     const body = await readFile(req.promptPath, 'utf8');
-    await writeFile(file, `---\nname: ${name}\ndescription: Consensus prose participant.\ntools: []\n---\n${body}`);
+    // The viewer variant exists only for image turns: Antigravity's input accepts text alone.
+    const tools = viewer ? 'tools:\n  - view_file' : 'tools: []';
+    await writeFile(file, `---\nname: ${name}\ndescription: Consensus prose participant.\n${tools}\n---\n${body}`);
   }
   return name;
 }
 
+async function copyImages(workdir: string, images: ImageInput[]): Promise<string[]> {
+  const rels: string[] = [];
+  for (const img of images) {
+    const rel = `attachments/${img.threadId}/${img.id}${extname(img.path).toLowerCase()}`;
+    await mkdir(join(workdir, 'attachments', img.threadId), { recursive: true });
+    await copyFile(img.path, join(workdir, rel));
+    rels.push(rel);
+  }
+  return rels;
+}
+
 async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<AdapterEvent> {
   await mkdir(opts.workdir, { recursive: true });
-  const name = await ensureAgent(opts.workdir, req);
+  const images = req.images ?? [];
+  const name = await ensureAgent(opts.workdir, req, images.length > 0);
+  let message = req.message;
+  if (images.length) {
+    const rels = await copyImages(opts.workdir, images);
+    const list = rels.map((rel, i) => `- ${rel} (${images[i].name})`).join('\n');
+    message = `Attached images. Use view_file to look at each one before replying:\n${list}\n\n${req.message}`;
+  }
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const args = [
     ...(opts.binArgs ?? []),
@@ -75,7 +95,7 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
   ];
   // Antigravity drops a cancelled turn itself, so resuming in place is safe.
   if (req.sessionId) args.push('--conversation', req.sessionId);
-  args.push(`-p=${req.message}`);
+  args.push(`-p=${message}`);
 
   let sessionSent = false;
   let noise = '';

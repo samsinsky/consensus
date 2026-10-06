@@ -90,4 +90,24 @@ describe('gemini adapter', () => {
       { id: 'gemini-3.8-flash-low', label: 'Gemini 3.8 Flash (Low)', efforts: [] },
     ]);
   });
+  it('copies images into its folder and uses the view_file agent for that turn', async () => {
+    const { fake, adapter, req, workdir } = setup(OK_RUN);
+    const src = join(workdir, 'upload.png');
+    writeFileSync(src, Buffer.from([9, 9]));
+    await collect(adapter.send(req({ message: 'Thoughts?', images: [{ id: 'i1', name: 'hero.png', mime: 'image/png', path: src, threadId: 't9' }] })));
+    const args = (await fake.record()).argv;
+    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123-viewer');
+    expect(args.at(-1)).toBe('-p=Attached images. Use view_file to look at each one before replying:\n- attachments/t9/i1.png (hero.png)\n\nThoughts?');
+    expect(await readFile(join(workdir, 'attachments', 't9', 'i1.png'))).toEqual(Buffer.from([9, 9]));
+    const agent = await readFile(join(workdir, '.agents', 'agents', 'consensus-abc123-viewer.md'), 'utf8');
+    expect(agent).toBe('---\nname: consensus-abc123-viewer\ndescription: Consensus prose participant.\ntools:\n  - view_file\n---\nYou are an experienced editor.\n');
+  });
+
+  it('keeps the tool-less agent when there are no images', async () => {
+    const { fake, adapter, req } = setup(OK_RUN);
+    await collect(adapter.send(req()));
+    const args = (await fake.record()).argv;
+    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123');
+  });
 });
+

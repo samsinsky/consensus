@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -99,4 +99,26 @@ describe('claude adapter', () => {
     const models = await adapter.listModels();
     expect(models.map((m) => m.id)).toEqual(['opus', 'sonnet', 'haiku']);
   });
+  it('sends images as stream-json content blocks', async () => {
+    const { fake, adapter, req } = setup(OK_RUN);
+    const path = join(mkdtempSync(join(tmpdir(), 'img-')), 'file.png');
+    writeFileSync(path, Buffer.from([1, 2, 3]));
+    await collect(adapter.send(req({ message: 'What is this?', images: [{ id: 'i1', name: 'a.png', mime: 'image/png', path, threadId: 't' }] })));
+    const { argv, stdin } = await fake.record();
+    expect(argv[argv.indexOf('--input-format') + 1]).toBe('stream-json');
+    expect(JSON.parse(stdin)).toEqual({
+      type: 'user',
+      message: { role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AQID' } },
+        { type: 'text', text: 'What is this?' },
+      ] },
+    });
+  });
+
+  it('keeps plain stdin for messages without images', async () => {
+    const { fake, adapter, req } = setup(OK_RUN);
+    await collect(adapter.send(req()));
+    expect((await fake.record()).argv).not.toContain('--input-format');
+  });
 });
+

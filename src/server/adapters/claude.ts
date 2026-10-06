@@ -1,8 +1,8 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import type { ModelOption } from '../../shared/types.js';
 import { classifyError } from './errors.js';
 import { runJsonl } from './process.js';
-import { DEFAULT_TIMEOUT_MS, type AdapterEvent, type CliOptions, type ProviderAdapter, type SendRequest } from './types.js';
+import { DEFAULT_TIMEOUT_MS, type AdapterEvent, type CliOptions, type ImageInput, type ProviderAdapter, type SendRequest } from './types.js';
 
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -38,6 +38,8 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
   if (req.effort) args.push('--effort', req.effort);
   // Fork every turn: a stopped turn lands in a fork we never record.
   if (req.sessionId) args.push('--resume', req.sessionId, '--fork-session');
+  const images = req.images ?? [];
+  if (images.length) args.push('--input-format', 'stream-json');
 
   let sessionSent = false;
   let noise = '';
@@ -46,7 +48,7 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
     args,
     cwd: opts.workdir,
     env: opts.env,
-    stdin: req.message,
+    stdin: images.length ? await imageMessage(req.message, images) : req.message,
     signal: req.signal,
     timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
   })) {
@@ -74,4 +76,14 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
       return;
     }
   }
+}
+
+/** One stream-json user message: image blocks first, then the text. */
+async function imageMessage(text: string, images: ImageInput[]): Promise<string> {
+  const content: object[] = [];
+  for (const img of images) {
+    content.push({ type: 'image', source: { type: 'base64', media_type: img.mime, data: (await readFile(img.path)).toString('base64') } });
+  }
+  content.push({ type: 'text', text });
+  return `${JSON.stringify({ type: 'user', message: { role: 'user', content } })}\n`;
 }

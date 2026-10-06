@@ -119,4 +119,15 @@ describe('codex adapter', () => {
     const { adapter } = setup(OK_RUN, '/nonexistent');
     expect((await adapter.listModels())[0].id).toBe('gpt-5.6-terra');
   });
+  it('passes each image with -i before the stdin marker', async () => {
+    const { fake, adapter, req } = setup(OK_RUN);
+    const images = [
+      { id: 'i1', name: 'a.png', mime: 'image/png', path: '/tmp/x/a.png', threadId: 't' },
+      { id: 'i2', name: 'b.jpg', mime: 'image/jpeg', path: '/tmp/x/b.jpg', threadId: 't' },
+    ];
+    await collect(adapter.send(req({ sessionId: 'th-old', images })));
+    const args = (await fake.record()).argv;
+    expect(args.slice(-5)).toEqual(['-i', '/tmp/x/a.png', '-i', '/tmp/x/b.jpg', '-']);
+  });
 });
+

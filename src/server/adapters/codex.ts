@@ -57,7 +57,8 @@ async function* send(opts: CodexOptions, req: SendRequest): AsyncGenerator<Adapt
   if (req.effort) common.push('-c', `model_reasoning_effort=${JSON.stringify(req.effort)}`);
   // Fork every turn: a stopped turn lands in a fork we never record.
   const head = req.sessionId ? ['exec', 'fork', req.sessionId] : ['exec'];
-  const args = [...(opts.binArgs ?? []), ...head, ...common, '-'];
+  const imageArgs = (req.images ?? []).flatMap((img) => ['-i', img.path]);
+  const args = [...(opts.binArgs ?? []), ...head, ...common, ...imageArgs, '-'];
 
   const texts: string[] = [];
   let lastError = '';
