@@ -59,6 +59,18 @@ describe('composeOutgoing', () => {
     expect(composeOutgoing('Tighten it', [])).toBe('Tighten it');
   });
 
+  it('adds the original request and the text the reply was responding to', () => {
+    expect(composeOutgoing('Rewrite it', [{ messageId: 'r2', text: 'Too vague' }], {
+      originalRequest: 'Write a headline',
+      contexts: ['Kitchens that run themselves'],
+    })).toBe(
+      'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+        'Text another reviewer was responding to:\n<context>\nKitchens that run themselves\n</context>\n\n' +
+        'Feedback from another reviewer:\n<quoted>\nToo vague\n</quoted>\n\n' +
+        'Rewrite it',
+    );
+  });
+
   it('wraps each quote without naming its source', () => {
     expect(composeOutgoing('Critique these', [{ messageId: 'm1', text: 'Option A' }, { messageId: 'm2', text: 'Option B' }])).toBe(
       'Feedback from another reviewer:\n<quoted>\nOption A\n</quoted>\n\n' +
@@ -239,5 +251,69 @@ describe('Router participant numbering', () => {
     const b = await router.addParticipant(t.id, { provider: 'codex', model: 'gpt-6-luna' });
     const c = await router.addParticipant(t.id, { provider: 'claude', model: 'opus' });
     expect([a.ordinal, b.ordinal, c.ordinal]).toEqual([1, 1, 2]);
+  });
+});
+
+describe('Router forwarding context', () => {
+  async function reply(c: ReturnType<typeof controllable>, done: Promise<void>, text: string) {
+    c.last().push({ type: 'done', text });
+    c.last().end();
+    await done;
+  }
+
+  async function chain() {
+    const gemini = controllable('gemini');
+    router = new Router({
+      store, hub, paths: makePaths(await mkdtemp(join(tmpdir(), 'consensus-'))),
+      adapters: { claude: claude.adapter, codex: codex.adapter, gemini: gemini.adapter },
+    });
+    const t = await router.createThread();
+    const a = await router.addParticipant(t.id, { provider: 'claude', model: 'opus' });
+    const b = await router.addParticipant(t.id, { provider: 'codex', model: 'gpt-6-luna' });
+    const c = await router.addParticipant(t.id, { provider: 'gemini', model: 'gemini-3.1-pro-high' });
+    const s1 = await router.send(t.id, { to: a.id, text: 'Write a headline' });
+    await reply(claude, s1.done, 'Kitchens that run themselves');
+    const s2 = await router.send(t.id, { to: b.id, text: 'What do you think?', quotes: [{ messageId: s1.replyMessageId, text: 'Kitchens that run themselves' }] });
+    await reply(codex, s2.done, 'Too vague');
+    return { t, a, b, c, gemini, s1, s2 };
+  }
+
+  it('forwards a direct reply with its original request and no context block', async () => {
+    const { t, b, s1 } = await chain();
+    await router.send(t.id, { to: b.id, text: 'Again', quotes: [{ messageId: s1.replyMessageId, text: 'Kitchens' }] }).catch(() => {});
+    expect(codex.requests[0].message).toBe(
+      'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+        'Feedback from another reviewer:\n<quoted>\nKitchens that run themselves\n</quoted>\n\n' +
+        'What do you think?',
+    );
+  });
+
+  it('forwards a reply to a forward with the root request and what it responded to', async () => {
+    const { t, c, gemini, s2 } = await chain();
+    await router.send(t.id, { to: c.id, text: 'Rewrite with that in mind', quotes: [{ messageId: s2.replyMessageId, text: 'Too vague' }] });
+    expect(gemini.requests[0].message).toBe(
+      'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+        'Text another reviewer was responding to:\n<context>\nKitchens that run themselves\n</context>\n\n' +
+        'Feedback from another reviewer:\n<quoted>\nToo vague\n</quoted>\n\n' +
+        'Rewrite with that in mind',
+    );
+  });
+
+  it('follows a long chain back to the first request without including middle opinions', async () => {
+    const { t, a, c, gemini, s2 } = await chain();
+    const s3 = await router.send(t.id, { to: c.id, text: 'Rewrite', quotes: [{ messageId: s2.replyMessageId, text: 'Too vague' }] });
+    await reply(gemini, s3.done, 'Run every kitchen from one recipe');
+    await router.send(t.id, { to: a.id, text: 'Thoughts?', quotes: [{ messageId: s3.replyMessageId, text: 'Run every kitchen from one recipe' }] });
+    const sent = claude.requests.at(-1)!.message;
+    expect(sent).toContain('<request>\nWrite a headline\n</request>');
+    expect(sent).toContain('<context>\nToo vague\n</context>');
+    expect(sent).toContain('<quoted>\nRun every kitchen from one recipe\n</quoted>');
+    expect(sent).not.toContain('Kitchens that run themselves');
+  });
+
+  it('falls back to the bare quote when its source is unknown', async () => {
+    const { t, b } = await threadWithTwo();
+    await router.send(t.id, { to: b.id, text: 'Hm', quotes: [{ messageId: 'gone', text: 'Old text' }] });
+    expect(codex.requests[0].message).toBe('Feedback from another reviewer:\n<quoted>\nOld text\n</quoted>\n\nHm');
   });
 });

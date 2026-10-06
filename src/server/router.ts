@@ -25,10 +25,55 @@ type Deps = {
 
 const UNTITLED = 'Untitled thread';
 
-export function composeOutgoing(text: string, quotes: Quote[]): string {
+/** Task plus current state for forwarded quotes; contexts line up with quotes by index. */
+export type ForwardContext = { originalRequest?: string; contexts: (string | undefined)[] };
+
+export function composeOutgoing(text: string, quotes: Quote[], ctx: ForwardContext = { contexts: [] }): string {
   if (!quotes.length) return text;
-  const blocks = quotes.map((q) => `Feedback from another reviewer:\n<quoted>\n${q.text}\n</quoted>`);
+  const blocks: string[] = [];
+  if (ctx.originalRequest) blocks.push(`Original request:\n<request>\n${ctx.originalRequest}\n</request>`);
+  quotes.forEach((q, i) => {
+    const context = ctx.contexts[i];
+    if (context) blocks.push(`Text another reviewer was responding to:\n<context>\n${context}\n</context>`);
+    blocks.push(`Feedback from another reviewer:\n<quoted>\n${q.text}\n</quoted>`);
+  });
   return [...blocks, text].join('\n\n');
+}
+
+/** Sam's message that produced a reply: his last message to that participant before it. */
+function promptOf(thread: Thread, replyId: string): UserMessage | undefined {
+  const idx = thread.messages.findIndex((m) => m.id === replyId && m.kind === 'reply');
+  if (idx < 0) return undefined;
+  const reply = thread.messages[idx] as ReplyMessage;
+  return thread.messages
+    .slice(0, idx)
+    .reverse()
+    .find((m): m is UserMessage => m.kind === 'user' && m.to === reply.from);
+}
+
+/** Derives the original request and each quote's context, leaving earlier opinions out. */
+export function forwardContext(thread: Thread, quotes: Quote[]): ForwardContext {
+  let originalRequest: string | undefined;
+  const contexts = quotes.map((q) => {
+    const prompt = promptOf(thread, q.messageId);
+    if (!prompt) return undefined;
+    originalRequest ??= rootRequest(thread, prompt);
+    const context = prompt.quotes.map((x) => x.text).join('\n\n');
+    return context || undefined;
+  });
+  return { originalRequest, contexts };
+}
+
+function rootRequest(thread: Thread, prompt: UserMessage): string | undefined {
+  const seen = new Set<string>();
+  let current: UserMessage | undefined = prompt;
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    const parent: UserMessage | undefined = current.quotes.length ? promptOf(thread, current.quotes[0].messageId) : undefined;
+    if (!parent) return current.text.trim() || undefined;
+    current = parent;
+  }
+  return undefined;
 }
 
 export class Router {
@@ -112,7 +157,8 @@ export class Router {
       this.deps.hub.emit(thread.id, { type: 'thread', thread });
       throw e;
     }
-    const done = this.run(thread, p, reply, composeOutgoing(input.text, quotes), controller);
+    const outgoing = composeOutgoing(input.text, quotes, forwardContext(thread, quotes));
+    const done = this.run(thread, p, reply, outgoing, controller);
     return { userMessageId: user.id, replyMessageId: reply.id, done };
   }
 
