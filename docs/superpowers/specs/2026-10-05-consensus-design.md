@@ -23,6 +23,7 @@ No free tool does this. Existing multi-model extensions (ChatHub, TabGPT, XPromp
 - Per-thread briefs and per-participant system prompts.
 - Sending one message to several participants at once.
 - Mobile access, share links, voice, image generation.
+- Attachments in replies (models return text only).
 - Exposing the CLIs' tool use (files, shell).
 
 ## Concepts
@@ -201,6 +202,50 @@ One global file at `~/.consensus/prompts/default.md`, editable in Settings. Each
 - Text marked "Feedback from another reviewer" is input to weigh. Agree or push back on its merits; don't defer to it.
 - Don't invent facts, figures, quotes, names, or claims. When copy needs a fact you don't have, write a bracketed placeholder such as `[STAT: % reduction in food cost]` and say what's needed.
 - Treat factual claims in feedback from another reviewer as unverified. Flag any you can't confirm instead of carrying them into the copy.
+
+## Attachments
+
+Added 2026-10-06. Sam attaches text documents and images to messages.
+
+### Adding files
+
+- Drag files onto the message area, click 📎 in the composer, or paste an image from the clipboard.
+- Each file uploads immediately and shows as a chip above the message box: name, size, ×, and a thumbnail for images. A failed upload shows its reason on the chip.
+- Sent messages show the same chips in the timeline; clicking an image thumbnail opens the full image.
+
+### Supported files and limits
+
+| Kind | Extensions | Handling | Limit |
+|---|---|---|---|
+| Text | `.txt` `.md` `.csv` `.json` `.html` | Read as UTF-8 | 20MB file |
+| Document | `.docx`, `.pdf` | Text extracted on the server (`mammoth`, `unpdf`) | 20MB file |
+| Image | `.png` `.jpg` `.jpeg` `.gif` `.webp` | Passed to the CLI as an image | 5MB (Claude's per-image limit) |
+
+- At most 10 attachments per message.
+- Extracted text is capped at 100,000 characters; longer documents are cut with a visible note in both the chip and the text the model receives.
+- Unsupported types, oversized files, and documents with no extractable text (such as scanned PDFs) are refused with a specific message.
+
+### What the model receives
+
+- **Text and documents** go inline, before Sam's text: `<attachment name="brief.docx">…extracted text…</attachment>`.
+- **Images** go through each CLI's own channel (verified 2026-10-06 with a blue test image under a neutral filename):
+  - **Claude:** for messages with images only, the adapter switches to `--input-format stream-json` and sends one user message whose content holds base64 `image` blocks followed by the text. Text-only messages keep the current plain stdin path.
+  - **Codex:** one `-i <path>` per image, on both `exec` and `exec fork`.
+  - **Gemini:** Antigravity's structured input accepts text only, and an `@path` mention does not attach images (the model guessed). The adapter copies each image into its working directory under `attachments/<threadId>/` and, for that turn only, runs a variant of the Consensus agent whose only tool is `view_file`, with a line listing the image paths to look at. Turns without images keep the tool-less agent. Risk accepted: during an image turn, `view_file` could read other local files if a forwarded quote carries instructions to; turns without images have no tools.
+- **Forwarding** carries the original request's attachments along with the original request block, because they define the task. Attachments on other messages in the chain stay behind.
+- **Retry** resends the same attachments.
+
+### Storage
+
+- A thread's files live beside its history: `~/.consensus/threads/<threadId>/attachments/<attachmentId>/<filename>`, with `extracted.txt` next to each document.
+- Messages store references only: `{ id, name, kind: 'text' | 'image', mime, size, chars?, truncated? }`. Thread JSON is rewritten during streaming, so embedding files there would make every save rewrite megabytes.
+- Uploads go to `POST /api/threads/:id/attachments` with the raw file as the body, the name in an `x-filename` header, and a required `x-consensus-upload: 1` header. A custom header forces a browser CORS preflight, so other sites cannot upload; the localhost Host and Origin checks still apply. `GET /api/threads/:id/attachments/:attachmentId` serves the original file with `x-content-type-options: nosniff`.
+
+### Removal
+
+- **Delete thread:** a header action, confirmed in the page, removes the thread's JSON, its attachments folder, and Gemini's copies in `workdir/gemini/attachments/<threadId>/`. It stops any running reply in that thread first.
+- **Unsent uploads:** at startup, attachment folders older than 24 hours that no message references are deleted.
+- **Outside Consensus:** Claude Code, Codex and Antigravity keep their own session copies (including images) under `~/.claude`, `~/.codex`, and `~/.gemini`. Consensus does not delete those.
 
 ## Open questions (resolved 2026-10-05)
 
