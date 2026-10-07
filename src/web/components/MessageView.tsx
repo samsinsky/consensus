@@ -5,10 +5,11 @@ import type { Message, Quote, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
 import { AttachmentChip } from './AttachmentChip.js';
 import { CollapsibleQuote } from './CollapsibleQuote.js';
+import { Sources } from './Sources.js';
 
-type Props = { thread: Thread; message: Message; onForward: (q: Quote) => void };
+type Props = { thread: Thread; message: Message; activity?: string; onForward: (q: Quote) => void };
 
-export function MessageView({ thread, message, onForward }: Props) {
+export function MessageView({ thread, message, activity, onForward }: Props) {
   const body = useRef<HTMLDivElement>(null);
   const [actionError, setActionError] = useState<string>();
   const [hasSelection, setHasSelection] = useState(false);
@@ -69,8 +70,10 @@ export function MessageView({ thread, message, onForward }: Props) {
         {message.status === 'stopped' && <span className="badge">stopped</span>}
       </div>
       <div className="msg-body" ref={body}>
-        {message.text ? <Markdown>{message.text}</Markdown> : message.status === 'streaming' ? <span className="typing">Thinking…</span> : null}
+        {message.text ? <Markdown>{message.text}</Markdown> : message.status === 'streaming' && !activity ? <span className="typing">Thinking…</span> : null}
       </div>
+      {message.status === 'streaming' && activity && <div className="activity">{activity}…</div>}
+      {message.sources?.length ? <Sources urls={message.sources} /> : null}
       {message.status === 'error' && message.error && (
         <div className="error">
           <p>{message.error.message}</p>

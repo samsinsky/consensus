@@ -23,9 +23,9 @@ describe('MessageList', () => {
   it('survives re-render and unmount when scrollIntoView returns a Promise', () => {
     const host = document.createElement('div');
     const root = createRoot(host);
-    act(() => root.render(<MessageList thread={thread} messages={thread.messages} onForward={() => {}} />));
+    act(() => root.render(<MessageList thread={thread} messages={thread.messages} activity={{}} onForward={() => {}} />));
     const more = [...thread.messages, { id: 'u2', kind: 'user' as const, to: 'a', text: 'Again', quotes: [], sentAt: '' }];
-    expect(() => act(() => root.render(<MessageList thread={thread} messages={more} onForward={() => {}} />))).not.toThrow();
+    expect(() => act(() => root.render(<MessageList thread={thread} messages={more} activity={{}} onForward={() => {}} />))).not.toThrow();
     expect(() => act(() => root.unmount())).not.toThrow();
   });
 });

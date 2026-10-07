@@ -87,7 +87,7 @@ interface ProviderAdapter {
 Every adapter:
 
 - Replaces the CLI's system prompt with the Consensus prompt (Claude: `--system-prompt-file`; Codex: `-c model_instructions_file=…`; Gemini: a Consensus custom agent at `.agents/agents/consensus-<hash>.md` in its working directory, run with `--agent`).
-- Disables tools (Claude: `--tools ""`; Codex: `-s read-only` plus disabled plugins and `notify=[]`; Gemini: `tools: []` in the agent file).
+- Limits tools to web reading and search (see Web access); Codex runs read-only with agent features off.
 - Sets model and effort per call, so a model change applies on the next message.
 - Resumes the participant's conversation by session ID. Claude and Codex fork from the last completed session on every turn (`--fork-session`, `codex exec fork`), so a stopped turn never enters memory; the adapter discards the fork. Antigravity drops a cancelled turn on its own.
 - Runs in an empty working directory under `~/.consensus/workdir/<provider>`, so no `CLAUDE.md`, `AGENTS.md`, or project files leak into prose feedback. The Claude adapter passes `--setting-sources ""` and `--strict-mcp-config` to ignore `~/.claude`. (`--bare` would isolate further but refuses subscription sign-in.)
@@ -246,6 +246,23 @@ Added 2026-10-06. Sam attaches text documents and images to messages.
 - **Delete thread:** a header action, confirmed in the page, removes the thread's JSON, its attachments folder, and Gemini's copies in `workdir/gemini/attachments/<threadId>/`. It stops any running reply in that thread first.
 - **Unsent uploads:** at startup, attachment folders older than 24 hours that no message references are deleted.
 - **Outside Consensus:** Claude Code, Codex and Antigravity keep their own session copies (including images) under `~/.claude`, `~/.codex`, and `~/.gemini`. Consensus does not delete those.
+
+## Web access
+
+Added 2026-10-07. Participants can read web pages and search the web on every turn, using each CLI's own tools (verified with a page holding a phrase made up for the run, so only a real read returns it):
+
+| | Turned on with | Notes |
+|---|---|---|
+| Claude | `--tools "WebFetch,WebSearch"` and `--allowedTools WebFetch WebSearch` | Headless mode refuses tools that are not pre-approved. |
+| ChatGPT | `-c web_search="live"` | The default "cached" mode serves an index only. Luna sometimes gives up after one failed page open; Terra does not. |
+| Gemini | Agent tools `read_url_content`, `search_web`, `view_file`, plus `--dangerously-skip-permissions` | `read_url_content` saves the page to a local file, so `view_file` is required to read it. The documented allow rule lives in Antigravity's global settings, which Consensus does not touch; the flag can only approve the agent's three tools (verified: no shell). The agent file is named `consensus-<hash>-web` so older tool-less agent files are not reused. |
+
+- Adapters report `activity` ("Searching the web for …", "Reading nodejs.org") and `source` (each page opened). Search queries are activity only; sources are pages actually opened.
+- The router streams activity to the page without saving it, and saves each reply's sources in order without repeats.
+- Codex narrates tool use in earlier messages ("I'll open the page…"); a reply's final text is its last message. Claude's `result` and Antigravity's `response` are already final.
+- The default system prompt adds: "You can read web pages and search the web. When you state a fact from a page, say which page." An untouched copy of an earlier default on disk is upgraded; an edited prompt is left alone.
+- **UI:** while a reply streams, a status line shows its current activity. Under a reply that opened pages, a collapsed **Sources** row shows up to three site favicons (loaded directly from each site, first letter when missing) and "+ N more" for further sites; clicking expands every page as a link.
+- **Risk accepted:** a page or forwarded reply can carry instructions to fetch an attacker's URL with conversation text in it, and Gemini turns can read local files through `view_file`. Sam runs the CLIs in auto mode, which allows more than this. The Sources list makes every fetch visible.
 
 ## Open questions (resolved 2026-10-05)
 

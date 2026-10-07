@@ -29,7 +29,7 @@ export function App() {
       }
       return !c;
     });
-  const thread = useThread(activeId);
+  const { thread, activity } = useThread(activeId);
 
   const refresh = useCallback(() => api.listThreads().then(setThreads), []);
   const reloadSettings = useCallback(() => api.getSettings().then((s) => setSettings(s.settings)), []);
@@ -65,7 +65,7 @@ export function App() {
       />
       <main className="main">
         {thread && models && settings ? (
-          <ThreadView key={thread.id} thread={thread} models={models} defaults={settings.defaults} onDeleted={() => { setActiveId(undefined); refresh(); }} />
+          <ThreadView key={thread.id} thread={thread} activity={activity} models={models} defaults={settings.defaults} onDeleted={() => { setActiveId(undefined); refresh(); }} />
         ) : (
           <div className="empty">
             <p>Pick a thread or start a new one.</p>

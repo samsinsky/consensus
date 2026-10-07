@@ -2,7 +2,7 @@ import type { Message, Quote, ReplyMessage, Thread, ThreadEvent } from '../share
 
 export function applyEvent(thread: Thread | undefined, ev: ThreadEvent): Thread | undefined {
   if (ev.type === 'thread') return ev.thread;
-  if (!thread) return thread;
+  if (ev.type !== 'delta' || !thread) return thread;
   return {
     ...thread,
     messages: thread.messages.map((m) =>
@@ -41,4 +41,10 @@ export function autoQuote(thread: Thread, target: string | undefined, dismissed:
     .find((m): m is ReplyMessage => m.kind === 'reply' && m.status === 'done' && m.text.length > 0);
   if (!latest || latest.from === target || dismissed.has(latest.id)) return undefined;
   return { messageId: latest.id, text: latest.text };
+}
+
+/** Latest activity line per reply, such as "Reading nodejs.org". */
+export function applyActivity(map: Record<string, string>, ev: ThreadEvent): Record<string, string> {
+  if (ev.type !== 'activity') return map;
+  return { ...map, [ev.messageId]: ev.text };
 }

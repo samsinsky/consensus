@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Thread } from '../../src/shared/types.js';
-import { applyEvent, autoQuote, nextActive, paneMessages, streamingReply } from '../../src/web/threadState.js';
+import { applyActivity, applyEvent, autoQuote, nextActive, paneMessages, streamingReply } from '../../src/web/threadState.js';
 
 const base: Thread = {
   id: 't', title: 'T', createdAt: '', updatedAt: '',
@@ -79,5 +79,19 @@ describe('autoQuote', () => {
 
   it('attaches nothing without a target', () => {
     expect(autoQuote(t, undefined, new Set())).toBeUndefined();
+  });
+});
+
+describe('activity', () => {
+  it('never mixes activity into reply text', () => {
+    const next = applyEvent(base, { type: 'activity', messageId: 'r1', text: 'Reading nodejs.org' });
+    expect(next).toBe(base);
+  });
+
+  it('tracks the latest activity per streaming reply', () => {
+    let map = applyActivity({}, { type: 'activity', messageId: 'r1', text: 'Searching the web' });
+    map = applyActivity(map, { type: 'activity', messageId: 'r1', text: 'Reading nodejs.org' });
+    expect(map).toEqual({ r1: 'Reading nodejs.org' });
+    expect(applyActivity(map, { type: 'delta', messageId: 'r1', text: 'x' })).toBe(map);
   });
 });

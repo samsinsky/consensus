@@ -8,12 +8,13 @@ import { MessageList } from './MessageList.js';
 
 type Props = {
   thread: Thread;
+  activity: Record<string, string>;
   models: Record<ProviderId, ModelOption[]>;
   defaults: Record<ProviderId, ProviderDefaults>;
   onDeleted: () => void;
 };
 
-export function ThreadView({ thread, models, defaults, onDeleted }: Props) {
+export function ThreadView({ thread, activity, models, defaults, onDeleted }: Props) {
   const [view, setView] = useState<'timeline' | 'panes'>('timeline');
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [active, setActive] = useState<string | undefined>(() => nextActive(thread));
@@ -61,14 +62,14 @@ export function ThreadView({ thread, models, defaults, onDeleted }: Props) {
       )}
       {view === 'timeline' ? (
         <>
-          {composer(active, false, <MessageList thread={thread} messages={thread.messages} onForward={forward} />)}
+          {composer(active, false, <MessageList thread={thread} messages={thread.messages} activity={activity} onForward={forward} />)}
         </>
       ) : (
         <div className="panes">
           {shown.map((p) => (
             <section key={p.id} className="pane">
               <h2><span className={`dot ${p.provider}`} /> {participantLabel(p, thread.participants)}</h2>
-              {composer(p.id, true, <MessageList thread={thread} messages={paneMessages(thread, p.id)} onForward={forward} />)}
+              {composer(p.id, true, <MessageList thread={thread} messages={paneMessages(thread, p.id)} activity={activity} onForward={forward} />)}
             </section>
           ))}
           {!shown.length && <p className="empty">Tick a participant to show its pane.</p>}

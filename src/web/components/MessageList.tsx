@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react';
 import type { Message, Quote, Thread } from '../../shared/types.js';
 import { MessageView } from './MessageView.js';
 
-type Props = { thread: Thread; messages: Message[]; onForward: (q: Quote) => void };
+type Props = { thread: Thread; messages: Message[]; activity: Record<string, string>; onForward: (q: Quote) => void };
 
-export function MessageList({ thread, messages, onForward }: Props) {
+export function MessageList({ thread, messages, activity, onForward }: Props) {
   const end = useRef<HTMLDivElement>(null);
   const lastText = messages.at(-1)?.kind === 'reply' ? (messages.at(-1) as { text: string }).text.length : 0;
   // Braces matter: Chrome's scrollIntoView returns a Promise, which React would call as a cleanup.
@@ -14,7 +14,7 @@ export function MessageList({ thread, messages, onForward }: Props) {
   return (
     <div className="messages">
       {messages.map((m) => (
-        <MessageView key={m.id} thread={thread} message={m} onForward={onForward} />
+        <MessageView key={m.id} thread={thread} message={m} activity={activity[m.id]} onForward={onForward} />
       ))}
       <div ref={end} />
     </div>

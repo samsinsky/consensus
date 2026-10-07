@@ -441,3 +441,24 @@ describe('Router send races', () => {
     await expect(router.send(t.id, { to: a.id, text: 'Now works' })).resolves.toBeDefined();
   });
 });
+
+describe('Router web activity', () => {
+  it('saves opened pages once each and streams activity without saving it', async () => {
+    const { t, a } = await threadWithTwo();
+    const events: ThreadEvent[] = [];
+    hub.subscribe(t.id, (e) => events.push(e));
+    const { replyMessageId, done } = await router.send(t.id, { to: a.id, text: 'Check nodejs.org' });
+    const q = claude.last();
+    q.push({ type: 'activity', text: 'Reading nodejs.org' });
+    q.push({ type: 'source', url: 'https://nodejs.org/en' });
+    q.push({ type: 'source', url: 'https://nodejs.org/en' });
+    q.push({ type: 'source', url: 'https://github.com/nodejs/Release' });
+    q.push({ type: 'done', text: 'v24' });
+    q.end();
+    await done;
+    expect(events).toContainEqual({ type: 'activity', messageId: replyMessageId, text: 'Reading nodejs.org' });
+    const saved = (await store.get(t.id))!.messages.find((m) => m.id === replyMessageId);
+    expect(saved).toMatchObject({ status: 'done', sources: ['https://nodejs.org/en', 'https://github.com/nodejs/Release'] });
+    expect(JSON.stringify(saved)).not.toContain('Reading nodejs.org');
+  });
+});

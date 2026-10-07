@@ -76,6 +76,8 @@ export type ReplyMessage = {
   effort?: string;
   status: ReplyStatus;
   error?: AdapterError;
+  /** Pages the participant opened while replying, in order, without repeats. */
+  sources?: string[];
   sentAt: string;
   origin?: Origin;
 };
@@ -108,4 +110,6 @@ export type Settings = { defaults: Record<ProviderId, ProviderDefaults> };
 
 export type ThreadEvent =
   | { type: 'thread'; thread: Thread }
-  | { type: 'delta'; messageId: string; text: string };
+  | { type: 'delta'; messageId: string; text: string }
+  /** What a streaming reply's participant is doing; not saved. */
+  | { type: 'activity'; messageId: string; text: string };

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { makePaths } from '../../src/server/paths.js';
 import {
-  DEFAULT_PROMPT, promptHash, readPrompt, snapshotPath, snapshotPrompt, writePrompt,
+  DEFAULT_PROMPT, PREVIOUS_DEFAULTS, promptHash, readPrompt, snapshotPath, snapshotPrompt, writePrompt,
 } from '../../src/server/prompt.js';
 
 const tmpPaths = async () => makePaths(await mkdtemp(join(tmpdir(), 'consensus-')));
@@ -34,4 +34,17 @@ describe('prompt', () => {
     expect(await readFile(snapshotPath(paths, h1), 'utf8')).toBe('Version one');
     expect(await readFile(snapshotPath(paths, h2), 'utf8')).toBe('Version two');
   });
+  it('mentions web reading and asks for the page behind each fact', () => {
+    expect(DEFAULT_PROMPT).toContain('You can read web pages and search the web. When you state a fact from a page, say which page.');
+  });
+
+  it('upgrades an untouched older default and leaves edited prompts alone', async () => {
+    const paths = await tmpPaths();
+    await writePrompt(paths, PREVIOUS_DEFAULTS[0]);
+    expect(await readPrompt(paths)).toBe(DEFAULT_PROMPT);
+    expect(await readFile(paths.promptFile, 'utf8')).toBe(DEFAULT_PROMPT);
+    await writePrompt(paths, PREVIOUS_DEFAULTS[0] + 'My own line.\n');
+    expect(await readPrompt(paths)).toBe(PREVIOUS_DEFAULTS[0] + 'My own line.\n');
+  });
 });
+

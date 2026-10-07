@@ -9,19 +9,20 @@ import { makePaths } from '../src/server/paths.js';
 import { snapshotPath, snapshotPrompt, writePrompt } from '../src/server/prompt.js';
 import type { ProviderId } from '../src/shared/types.js';
 
-const CHEAP: Record<ProviderId, { model: string; effort?: string; switchTo: string }> = {
-  claude: { model: 'haiku', switchTo: 'sonnet' },
-  codex: { model: 'gpt-5.5', effort: 'low', switchTo: 'gpt-6-luna' },
-  gemini: { model: 'gemini-3.8-flash-low', switchTo: 'gemini-3.1-pro-low' },
+// web: the model used for the web check; Luna sometimes gives up after one failed page open, Terra does not.
+const CHEAP: Record<ProviderId, { model: string; effort?: string; switchTo: string; web: string }> = {
+  claude: { model: 'haiku', switchTo: 'sonnet', web: 'haiku' },
+  codex: { model: 'gpt-5.5', effort: 'low', switchTo: 'gpt-6-luna', web: 'gpt-5.6-terra' },
+  gemini: { model: 'gemini-3.8-flash-low', switchTo: 'gemini-3.1-pro-low', web: 'gemini-3.1-pro-low' },
 };
 
-type Outcome = { session?: string; text: string; deltas: number; done: boolean; error?: string };
+type Outcome = { session?: string; text: string; deltas: number; done: boolean; error?: string; sources: string[] };
 
 async function run(adapter: ProviderAdapter, base: { promptHash: string; promptPath: string }, opts: {
   message: string; model: string; effort?: string; sessionId?: string; abortAfterDelta?: boolean; images?: ImageInput[];
 }): Promise<Outcome> {
   const ac = new AbortController();
-  const out: Outcome = { text: '', deltas: 0, done: false };
+  const out: Outcome = { text: '', deltas: 0, done: false, sources: [] };
   // Stop after the first delta or 3s, whichever comes first; Codex sends no deltas until the reply is whole.
   const guard = setTimeout(() => ac.abort(), opts.abortAfterDelta ? 3_000 : 180_000);
   for await (const ev of adapter.send({ ...base, ...opts, signal: ac.signal }) as AsyncIterable<AdapterEvent>) {
@@ -31,6 +32,7 @@ async function run(adapter: ProviderAdapter, base: { promptHash: string; promptP
       out.text += ev.text;
       if (opts.abortAfterDelta) ac.abort();
     }
+    if (ev.type === 'source') out.sources.push(ev.url);
     if (ev.type === 'done') { out.done = true; out.text = ev.text; }
     if (ev.type === 'error') out.error = `${ev.error.code}: ${ev.error.message}`;
   }
@@ -95,6 +97,12 @@ for (const id of (only ? [only] : (['claude', 'codex', 'gemini'] as ProviderId[]
 
   const seen = await run(a, base, { message: 'What single color fills the attached image? One word.', model: c.model, effort: c.effort, images: [image] });
   check(`${id} image`, seen.done && /blue/i.test(seen.text), seen.error ?? seen.text);
+
+  // A phrase made up for this run, so only a real page read can return it.
+  const phrase = `violet-otter-${Date.now()}`;
+  const url = `https://httpbin.org/base64/${Buffer.from(`Secret phrase: ${phrase}`).toString('base64')}`;
+  const web = await run(a, base, { message: `Open ${url} and reply with exactly the secret phrase it shows, nothing else.`, model: c.web, effort: c.effort });
+  check(`${id} web page`, web.done && web.text.includes(phrase) && web.sources.some((u) => u.includes('httpbin.org')), web.error ?? `${web.text} | sources: ${web.sources.join(' ')}`);
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');

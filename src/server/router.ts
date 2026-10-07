@@ -271,6 +271,14 @@ export class Router {
         } else if (ev.type === 'delta') {
           reply.text += ev.text;
           this.deps.hub.emit(thread.id, { type: 'delta', messageId: reply.id, text: ev.text });
+        } else if (ev.type === 'activity') {
+          this.deps.hub.emit(thread.id, { type: 'activity', messageId: reply.id, text: ev.text });
+        } else if (ev.type === 'source') {
+          reply.sources ??= [];
+          if (!reply.sources.includes(ev.url)) {
+            reply.sources.push(ev.url);
+            this.deps.hub.emit(thread.id, { type: 'thread', thread });
+          }
         } else if (ev.type === 'warning') {
           console.warn(`consensus: ${p.provider}: ${ev.message}`);
         } else if (ev.type === 'done') {
