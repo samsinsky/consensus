@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { participantLabel } from '../../shared/labels.js';
 import type { ModelOption, ProviderDefaults, ProviderId, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
@@ -19,12 +19,30 @@ export function ParticipantChip({ thread, models, defaults, target, onSelect }: 
   const [mode, setMode] = useState<Mode>({ kind: thread.participants.length ? 'list' : 'new' });
   const [error, setError] = useState<string>();
   const current = thread.participants.find((p) => p.id === target);
+  const wrap = useRef<HTMLDivElement>(null);
 
   const close = () => {
     setOpen(false);
     setMode({ kind: 'list' });
     setError(undefined);
   };
+
+  // Close on a click outside the chip and its menu, or on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   const create = async (provider: ProviderId, model: string, effort?: string) => {
     try {
@@ -46,7 +64,7 @@ export function ParticipantChip({ thread, models, defaults, target, onSelect }: 
   };
 
   return (
-    <div className="chip-wrap">
+    <div className="chip-wrap" ref={wrap}>
       <button className={`chip ${current?.provider ?? ''}`} onClick={() => (open ? close() : setOpen(true))}>
         {current ? <><span className={`dot ${current.provider}`} /> {participantLabel(current, thread.participants)}</> : 'Choose a participant'} ▾
       </button>
