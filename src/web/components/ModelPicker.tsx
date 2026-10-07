@@ -15,8 +15,7 @@ export function ModelPicker({ models, defaults, fixedProvider, initial, submitLa
   const [model, setModel] = useState(initial?.model ?? defaults[provider].model);
   const [effort, setEffort] = useState(initial?.effort ?? defaults[provider].effort ?? '');
   const options = models[provider] ?? [];
-  const selected = options.find((m) => m.id === model);
-  const efforts = selected?.efforts ?? [];
+  const efforts = options.find((m) => m.id === model)?.efforts ?? [];
 
   const changeProvider = (p: ProviderId) => {
     setProvider(p);
@@ -42,7 +41,6 @@ export function ModelPicker({ models, defaults, fixedProvider, initial, submitLa
         </select>
       )}
       <button onClick={() => onPick(provider, model, efforts.length && effort ? effort : undefined)}>{submitLabel}</button>
-      {selected?.description && <p className="model-desc">{selected.description}</p>}
     </div>
   );
 }

@@ -9,7 +9,7 @@ export const PROVIDERS: Record<ProviderId, { name: string }> = {
 };
 
 /** efforts is empty when the provider bakes effort into the model id. */
-export type ModelOption = { id: string; label: string; efforts: string[]; description?: string };
+export type ModelOption = { id: string; label: string; efforts: string[] };
 
 export type Participant = {
   id: string;

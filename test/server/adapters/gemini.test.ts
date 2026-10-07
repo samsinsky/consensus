@@ -82,15 +82,35 @@ describe('gemini adapter', () => {
     expect(events).toEqual([{ type: 'error', error: expect.objectContaining({ code: 'not_logged_in' }) }]);
   });
 
-  it('lists Gemini models from agy models output', async () => {
+  it('groups Gemini models by name with their effort levels', async () => {
     const { adapter } = setup({
-      lines: ['Fetching available models...', 'gemini-3.1-pro-high\tGemini 3.1 Pro (High)', 'claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)', 'gemini-3.8-flash-low\tGemini 3.8 Flash (Low)'],
+      lines: [
+        'Fetching available models...',
+        'gemini-3.8-flash-high\tGemini 3.8 Flash (High)',
+        'gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)',
+        'gemini-3.8-flash-low\tGemini 3.8 Flash (Low)',
+        'gemini-3.1-pro-high\tGemini 3.1 Pro (High)',
+        'gemini-3.1-pro-low\tGemini 3.1 Pro (Low)',
+        'claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)',
+      ],
     });
     expect(await adapter.listModels()).toEqual([
-      { id: 'gemini-3.1-pro-high', label: 'Gemini 3.1 Pro (High)', efforts: [] },
-      { id: 'gemini-3.8-flash-low', label: 'Gemini 3.8 Flash (Low)', efforts: [] },
+      { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', efforts: ['high', 'medium', 'low'] },
+      { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro', efforts: ['high', 'low'] },
     ]);
   });
+
+  it('joins model and effort into the slug agy expects, and keeps older full slugs working', async () => {
+    const first = setup(OK_RUN);
+    await collect(first.adapter.send(first.req({ model: 'gemini-3.1-pro', effort: 'low' })));
+    const a1 = (await first.fake.record()).argv;
+    expect(a1[a1.indexOf('--model') + 1]).toBe('gemini-3.1-pro-low');
+    const legacy = setup(OK_RUN);
+    await collect(legacy.adapter.send(legacy.req({ model: 'gemini-3.1-pro-high' })));
+    const a2 = (await legacy.fake.record()).argv;
+    expect(a2[a2.indexOf('--model') + 1]).toBe('gemini-3.1-pro-high');
+  });
+
   it('copies images into its folder and uses the view_file agent for that turn', async () => {
     const { fake, adapter, req, workdir } = setup(OK_RUN);
     const src = join(workdir, 'upload.png');

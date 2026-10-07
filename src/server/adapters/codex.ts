@@ -33,7 +33,6 @@ async function listModels(codexHome: string): Promise<ModelOption[]> {
         id: m.slug as string,
         label: (m.display_name as string) ?? m.slug,
         efforts: ((m.supported_reasoning_levels ?? []) as { effort: string }[]).map((l) => l.effort),
-        ...(typeof m.description === 'string' ? { description: m.description as string } : {}),
       }));
     return options.length ? options : FALLBACK_MODELS;
   } catch {

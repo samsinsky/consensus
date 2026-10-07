@@ -111,9 +111,7 @@ describe('codex adapter', () => {
       ],
     }));
     const { adapter } = setup(OK_RUN, home);
-    expect(await adapter.listModels()).toEqual([
-      { id: 'gpt-6-luna', label: 'GPT-6-Luna', efforts: ['low', 'high'], description: 'Fast and affordable model for easier tasks.' },
-    ]);
+    expect(await adapter.listModels()).toEqual([{ id: 'gpt-6-luna', label: 'GPT-6-Luna', efforts: ['low', 'high'] }]);
   });
 
   it('falls back to a default model list when the cache is missing', async () => {

@@ -6,9 +6,10 @@ import { runJsonl } from './process.js';
 import { DEFAULT_TIMEOUT_MS, hostOf, type AdapterEvent, type CliOptions, type ImageInput, type ProviderAdapter, type SendRequest } from './types.js';
 
 const FALLBACK_MODELS: ModelOption[] = [
-  { id: 'gemini-3.1-pro-high', label: 'Gemini 3.1 Pro (High)', efforts: [] },
-  { id: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash (High)', efforts: [] },
+  { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro', efforts: ['high', 'low'] },
+  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', efforts: ['high', 'medium', 'low'] },
 ];
+const EFFORT_SUFFIX = /^(.+)-(high|medium|low)$/;
 const MODELS_TTL_MS = 10 * 60 * 1000;
 const MAX_PROMPT_BYTES = 900_000;
 
@@ -33,6 +34,7 @@ export function createGeminiAdapter(opts: CliOptions): ProviderAdapter {
 
 async function listModels(opts: CliOptions): Promise<ModelOption[]> {
   await mkdir(opts.workdir, { recursive: true });
+  // agy lists each effort as its own model (gemini-3.1-pro-high, -low); group them into one model with efforts.
   const models: ModelOption[] = [];
   for await (const item of runJsonl({
     bin: opts.bin ?? 'agy',
@@ -44,7 +46,13 @@ async function listModels(opts: CliOptions): Promise<ModelOption[]> {
   })) {
     if (item.type !== 'line') continue;
     const m = /^(gemini-\S+)\t(.+)$/.exec(item.text);
-    if (m) models.push({ id: m[1], label: m[2].trim(), efforts: [] });
+    if (!m) continue;
+    const split = EFFORT_SUFFIX.exec(m[1]);
+    const id = split ? split[1] : m[1];
+    const label = m[2].replace(/\s*\((High|Medium|Low)\)\s*$/i, '').trim();
+    let model = models.find((x) => x.id === id);
+    if (!model) models.push((model = { id, label, efforts: [] }));
+    if (split) model.efforts.push(split[2]);
   }
   return models.length ? models : FALLBACK_MODELS;
 }
@@ -91,7 +99,8 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
   const args = [
     ...(opts.binArgs ?? []),
     '--agent', name,
-    '--model', req.model,
+    // Older participants store the full slug (gemini-3.1-pro-high) with no separate effort.
+    '--model', req.effort ? `${req.model}-${req.effort}` : req.model,
     '--output-format', 'stream-json',
     // Headless mode cannot ask; the agent's tool list bounds what this approves.
     '--dangerously-skip-permissions',

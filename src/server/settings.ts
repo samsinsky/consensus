@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaults: {
     claude: { model: 'opus', effort: 'high' },
     codex: { model: 'gpt-5.6-terra', effort: 'high' },
-    gemini: { model: 'gemini-3.1-pro-high' },
+    gemini: { model: 'gemini-3.1-pro', effort: 'high' },
   },
 };
 
