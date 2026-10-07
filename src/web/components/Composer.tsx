@@ -120,43 +120,45 @@ export function Composer({ thread, models, defaults, target, lockTarget, onTarge
         )}
       </div>
       <div className="composer-row">
-        <button className="ghost attach" onClick={() => picker.current?.click()} title="Attach files">📎</button>
-        <input
-          ref={picker}
-          type="file"
-          multiple
-          hidden
-          accept=".txt,.md,.csv,.json,.html,.htm,.docx,.pdf,.png,.jpg,.jpeg,.gif,.webp"
-          onChange={(e) => {
-            add(Array.from(e.target.files ?? []));
-            e.target.value = '';
-          }}
-        />
-        <textarea
-          ref={box}
-          rows={1}
-          value={text}
-          placeholder={running ? 'Waiting for the reply…' : 'Write your message. Cmd+Enter to send.'}
-          onChange={(e) => setText(e.target.value)}
-          onPaste={(e) => {
-            const pasted = Array.from(e.clipboardData.files);
-            if (pasted.length) {
-              e.preventDefault();
-              add(pasted);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              send();
-            }
-          }}
-        />
-        {running ? (
-          <button onClick={() => api.stop(thread.id, running.id).catch((e: Error) => setError(e.message))}>Stop</button>
-        ) : (
-          <button className="primary" disabled={!canSend} onClick={send}>Send</button>
-        )}
+        <div className="input-wrap">
+          <button className="ghost attach" onClick={() => picker.current?.click()} title="Attach files" aria-label="Attach files">📎</button>
+          <input
+            ref={picker}
+            type="file"
+            multiple
+            hidden
+            accept=".txt,.md,.csv,.json,.html,.htm,.docx,.pdf,.png,.jpg,.jpeg,.gif,.webp"
+            onChange={(e) => {
+              add(Array.from(e.target.files ?? []));
+              e.target.value = '';
+            }}
+          />
+          <textarea
+            ref={box}
+            rows={1}
+            value={text}
+            placeholder={running ? 'Waiting for the reply…' : 'Write your message. Cmd+Enter to send.'}
+            onChange={(e) => setText(e.target.value)}
+            onPaste={(e) => {
+              const pasted = Array.from(e.clipboardData.files);
+              if (pasted.length) {
+                e.preventDefault();
+                add(pasted);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                send();
+              }
+            }}
+          />
+          {running ? (
+            <button className="send-btn stop" onClick={() => api.stop(thread.id, running.id).catch((e: Error) => setError(e.message))} title="Stop" aria-label="Stop">■</button>
+          ) : (
+            <button className="send-btn" disabled={!canSend} onClick={send} title="Send (Cmd+Enter)" aria-label="Send">↑</button>
+          )}
+        </div>
       </div>
       {error && <p className="error-inline">{error}</p>}
     </div>

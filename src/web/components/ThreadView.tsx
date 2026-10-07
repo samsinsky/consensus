@@ -11,10 +11,9 @@ type Props = {
   activity: Record<string, string>;
   models: Record<ProviderId, ModelOption[]>;
   defaults: Record<ProviderId, ProviderDefaults>;
-  onDeleted: () => void;
 };
 
-export function ThreadView({ thread, activity, models, defaults, onDeleted }: Props) {
+export function ThreadView({ thread, activity, models, defaults }: Props) {
   const [view, setView] = useState<'timeline' | 'panes'>('timeline');
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [active, setActive] = useState<string | undefined>(() => nextActive(thread));
@@ -48,7 +47,6 @@ export function ThreadView({ thread, activity, models, defaults, onDeleted }: Pr
           <button className={view === 'timeline' ? 'on' : ''} onClick={() => setView('timeline')}>Timeline</button>
           <button className={view === 'panes' ? 'on' : ''} onClick={() => setView('panes')} disabled={!thread.participants.length}>Panes</button>
         </div>
-        <DeleteThread threadId={thread.id} onDeleted={onDeleted} />
       </header>
       {view === 'panes' && (
         <div className="pane-picker">
@@ -121,19 +119,5 @@ function ThreadTitle({ thread }: { thread: Thread }) {
       />
       {error && <span className="error-inline">{error}</span>}
     </div>
-  );
-}
-
-function DeleteThread({ threadId, onDeleted }: { threadId: string; onDeleted: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState<string>();
-  if (!confirming) return <button className="ghost" onClick={() => setConfirming(true)}>Delete</button>;
-  return (
-    <span className="confirm">
-      Delete this thread and its files?
-      <button className="danger" onClick={() => api.deleteThread(threadId).then(onDeleted, (e: Error) => setError(e.message))}>Delete</button>
-      <button onClick={() => setConfirming(false)}>Cancel</button>
-      {error && <span className="error-inline">{error}</span>}
-    </span>
   );
 }

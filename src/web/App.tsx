@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ModelOption, ProviderId, Settings, ThreadSummary } from '../shared/types.js';
 import { api } from './api.js';
 import { guardFileDrops } from './dropGuard.js';
+import { clampSidebarWidth, SIDEBAR } from './layout.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
 import { ThreadsSidebar } from './components/ThreadsSidebar.js';
 import { ThreadView } from './components/ThreadView.js';
@@ -20,6 +21,26 @@ export function App() {
       return false;
     }
   });
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      return clampSidebarWidth(Number(localStorage.getItem('consensus.sidebarWidth')) || SIDEBAR.initial);
+    } catch {
+      return SIDEBAR.initial;
+    }
+  });
+  const resizeSidebar = (width: number) => {
+    setSidebarWidth(width);
+    try {
+      localStorage.setItem('consensus.sidebarWidth', String(width));
+    } catch {
+      // Storage can be blocked; the width still applies for this visit.
+    }
+  };
+  const deleteThread = async (id: string) => {
+    await api.deleteThread(id);
+    if (id === activeId) setActiveId(undefined);
+    refresh();
+  };
   const toggleSidebar = () =>
     setCollapsed((c) => {
       try {
@@ -53,11 +74,14 @@ export function App() {
   };
 
   return (
-    <div className={collapsed ? 'app sidebar-collapsed' : 'app'}>
+    <div className={collapsed ? 'app sidebar-collapsed' : 'app'} style={collapsed ? undefined : { gridTemplateColumns: `${sidebarWidth}px 1fr` }}>
       <ThreadsSidebar
         threads={threads}
         activeId={activeId}
         collapsed={collapsed}
+        width={sidebarWidth}
+        onResize={resizeSidebar}
+        onDelete={deleteThread}
         onToggle={toggleSidebar}
         onSelect={setActiveId}
         onNew={newThread}
@@ -65,7 +89,7 @@ export function App() {
       />
       <main className="main">
         {thread && models && settings ? (
-          <ThreadView key={thread.id} thread={thread} activity={activity} models={models} defaults={settings.defaults} onDeleted={() => { setActiveId(undefined); refresh(); }} />
+          <ThreadView key={thread.id} thread={thread} activity={activity} models={models} defaults={settings.defaults} />
         ) : (
           <div className="empty">
             <p>Pick a thread or start a new one.</p>
