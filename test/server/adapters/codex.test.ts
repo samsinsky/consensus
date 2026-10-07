@@ -85,7 +85,8 @@ describe('codex adapter', () => {
     const events = await collect(adapter.send(req()));
     expect(events).toContainEqual({ type: 'warning', message: 'This session was recorded with model `gpt-6-luna`' });
     expect(events).toContainEqual({ type: 'delta', text: '\n\nSecond.' });
-    expect(events.at(-1)).toEqual({ type: 'done', text: 'First.\n\nSecond.' });
+    // Earlier messages narrate tool use; the reply is the final message.
+    expect(events.at(-1)).toEqual({ type: 'done', text: 'Second.' });
   });
 
   it('classifies a failed turn using the preceding error event', async () => {
@@ -128,6 +129,30 @@ describe('codex adapter', () => {
     await collect(adapter.send(req({ sessionId: 'th-old', images })));
     const args = (await fake.record()).argv;
     expect(args.slice(-5)).toEqual(['-i', '/tmp/x/a.png', '-i', '/tmp/x/b.jpg', '-']);
+  });
+  it('turns on live web search', async () => {
+    const { fake, adapter, req } = setup(OK_RUN);
+    await collect(adapter.send(req()));
+    expect((await fake.record()).argv).toContain('web_search="live"');
+  });
+
+  it('reports searches and opened pages', async () => {
+    const { adapter, req } = setup({
+      lines: [
+        { type: 'thread.started', thread_id: 't' },
+        { type: 'item.started', item: { type: 'web_search', query: '', action: { type: 'other' } } },
+        { type: 'item.completed', item: { type: 'web_search', query: 'node lts', action: { type: 'search', query: 'node lts' } } },
+        { type: 'item.completed', item: { type: 'web_search', query: 'https://nodejs.org/en/download/', action: { type: 'open_page', url: 'https://nodejs.org/en/download/' } } },
+        { type: 'item.completed', item: { type: 'agent_message', text: 'v24' } },
+        { type: 'turn.completed' },
+      ],
+    });
+    const events = await collect(adapter.send(req()));
+    expect(events.filter((e) => e.type === 'activity' || e.type === 'source')).toEqual([
+      { type: 'activity', text: 'Searching the web' },
+      { type: 'activity', text: 'Reading nodejs.org' },
+      { type: 'source', url: 'https://nodejs.org/en/download/' },
+    ]);
   });
 });
 

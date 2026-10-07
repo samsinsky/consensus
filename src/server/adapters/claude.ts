@@ -2,7 +2,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import type { ModelOption } from '../../shared/types.js';
 import { classifyError } from './errors.js';
 import { runJsonl } from './process.js';
-import { DEFAULT_TIMEOUT_MS, type AdapterEvent, type CliOptions, type ImageInput, type ProviderAdapter, type SendRequest } from './types.js';
+import { DEFAULT_TIMEOUT_MS, hostOf, type AdapterEvent, type CliOptions, type ImageInput, type ProviderAdapter, type SendRequest } from './types.js';
 
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -29,7 +29,9 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
     '--verbose',
     '--include-partial-messages',
     '--system-prompt-file', req.promptPath,
-    '--tools', '',
+    // Web reading and search only; allowedTools approves them, since headless mode cannot ask.
+    '--tools', 'WebFetch,WebSearch',
+    '--allowedTools', 'WebFetch', 'WebSearch',
     '--setting-sources', '',
     '--strict-mcp-config',
     '--no-chrome',
@@ -60,7 +62,16 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
         sessionSent = true;
         yield { type: 'session', sessionId: ev.session_id };
       }
-      if (ev.type === 'stream_event' && ev.event?.type === 'content_block_delta' && ev.event.delta?.type === 'text_delta') {
+      if (ev.type === 'assistant') {
+        for (const block of ev.message?.content ?? []) {
+          if (block?.type !== 'tool_use') continue;
+          if (block.name === 'WebSearch') yield { type: 'activity', text: `Searching the web for "${block.input?.query ?? ''}"` };
+          if (block.name === 'WebFetch' && typeof block.input?.url === 'string') {
+            yield { type: 'activity', text: `Reading ${hostOf(block.input.url)}` };
+            yield { type: 'source', url: block.input.url };
+          }
+        }
+      } else if (ev.type === 'stream_event' && ev.event?.type === 'content_block_delta' && ev.event.delta?.type === 'text_delta') {
         yield { type: 'delta', text: ev.event.delta.text };
       } else if (ev.type === 'result') {
         if (ev.is_error || ev.subtype !== 'success') {

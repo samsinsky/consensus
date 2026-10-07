@@ -45,7 +45,7 @@ describe('claude adapter', () => {
     const args = argv;
     expect(args).toEqual(expect.arrayContaining(['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--strict-mcp-config', '--no-chrome']));
     expect(args[args.indexOf('--system-prompt-file') + 1]).toBe('/tmp/prompt.md');
-    expect(args[args.indexOf('--tools') + 1]).toBe('');
+    expect(args[args.indexOf('--tools') + 1]).toBe('WebFetch,WebSearch');
     expect(args[args.indexOf('--setting-sources') + 1]).toBe('');
     expect(args[args.indexOf('--model') + 1]).toBe('opus');
     expect(args).not.toContain('--resume');
@@ -119,6 +119,32 @@ describe('claude adapter', () => {
     const { fake, adapter, req } = setup(OK_RUN);
     await collect(adapter.send(req()));
     expect((await fake.record()).argv).not.toContain('--input-format');
+  });
+  it('turns on web reading and search without permission prompts', async () => {
+    const { fake, adapter, req } = setup(OK_RUN);
+    await collect(adapter.send(req()));
+    const args = (await fake.record()).argv;
+    expect(args[args.indexOf('--tools') + 1]).toBe('WebFetch,WebSearch');
+    expect(args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--allowedTools') + 3)).toEqual(['WebFetch', 'WebSearch']);
+  });
+
+  it('reports searches and opened pages', async () => {
+    const { adapter, req } = setup({
+      lines: [
+        { type: 'system', subtype: 'init', session_id: 's' },
+        { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'WebSearch', input: { query: 'node lts' } }] }, session_id: 's' },
+        { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'WebFetch', input: { url: 'https://nodejs.org/en', prompt: 'x' } }] }, session_id: 's' },
+        { type: 'result', subtype: 'success', is_error: false, result: 'v24', session_id: 's' },
+      ],
+    });
+    const events = await collect(adapter.send(req()));
+    expect(events).toEqual([
+      { type: 'session', sessionId: 's' },
+      { type: 'activity', text: 'Searching the web for "node lts"' },
+      { type: 'activity', text: 'Reading nodejs.org' },
+      { type: 'source', url: 'https://nodejs.org/en' },
+      { type: 'done', text: 'v24' },
+    ]);
   });
 });
 

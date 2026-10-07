@@ -20,6 +20,10 @@ export type AdapterEvent =
   | { type: 'session'; sessionId: string }
   | { type: 'delta'; text: string }
   | { type: 'warning'; message: string }
+  /** What the participant is doing right now, such as reading a page. */
+  | { type: 'activity'; text: string }
+  /** A page the participant opened. */
+  | { type: 'source'; url: string }
   | { type: 'done'; text: string }
   | { type: 'error'; error: AdapterError };
 
@@ -40,3 +44,12 @@ export type CliOptions = {
 };
 
 export const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** Host shown in activity lines: "nodejs.org" for "https://www.nodejs.org/en". */
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}

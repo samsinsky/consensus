@@ -3,7 +3,7 @@ import { extname, join } from 'node:path';
 import type { ModelOption } from '../../shared/types.js';
 import { classifyError } from './errors.js';
 import { runJsonl } from './process.js';
-import { DEFAULT_TIMEOUT_MS, type AdapterEvent, type CliOptions, type ImageInput, type ProviderAdapter, type SendRequest } from './types.js';
+import { DEFAULT_TIMEOUT_MS, hostOf, type AdapterEvent, type CliOptions, type ImageInput, type ProviderAdapter, type SendRequest } from './types.js';
 
 const FALLBACK_MODELS: ModelOption[] = [
   { id: 'gemini-3.1-pro-high', label: 'Gemini 3.1 Pro (High)', efforts: [] },
@@ -13,7 +13,8 @@ const MODELS_TTL_MS = 10 * 60 * 1000;
 const MAX_PROMPT_BYTES = 900_000;
 
 export function agentName(promptHash: string): string {
-  return `consensus-${promptHash}`;
+  // The -web suffix keeps older tool-less agent files for the same prompt from being reused.
+  return `consensus-${promptHash}-web`;
 }
 
 export function createGeminiAdapter(opts: CliOptions): ProviderAdapter {
@@ -49,8 +50,8 @@ async function listModels(opts: CliOptions): Promise<ModelOption[]> {
 }
 
 /** Antigravity has no system-prompt flag; a custom agent's body becomes its system prompt. */
-async function ensureAgent(workdir: string, req: SendRequest, viewer: boolean): Promise<string> {
-  const name = viewer ? `${agentName(req.promptHash)}-viewer` : agentName(req.promptHash);
+async function ensureAgent(workdir: string, req: SendRequest): Promise<string> {
+  const name = agentName(req.promptHash);
   const dir = join(workdir, '.agents', 'agents');
   const file = join(dir, `${name}.md`);
   try {
@@ -58,8 +59,8 @@ async function ensureAgent(workdir: string, req: SendRequest, viewer: boolean): 
   } catch {
     await mkdir(dir, { recursive: true });
     const body = await readFile(req.promptPath, 'utf8');
-    // The viewer variant exists only for image turns: Antigravity's input accepts text alone.
-    const tools = viewer ? 'tools:\n  - view_file' : 'tools: []';
+    // read_url_content saves each page to a local file, so view_file is needed to read it (and images).
+    const tools = 'tools:\n  - read_url_content\n  - search_web\n  - view_file';
     await writeFile(file, `---\nname: ${name}\ndescription: Consensus prose participant.\n${tools}\n---\n${body}`);
   }
   return name;
@@ -79,7 +80,7 @@ async function copyImages(workdir: string, images: ImageInput[]): Promise<string
 async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<AdapterEvent> {
   await mkdir(opts.workdir, { recursive: true });
   const images = req.images ?? [];
-  const name = await ensureAgent(opts.workdir, req, images.length > 0);
+  const name = await ensureAgent(opts.workdir, req);
   let message = req.message;
   if (images.length) {
     const rels = await copyImages(opts.workdir, images);
@@ -92,6 +93,8 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
     '--agent', name,
     '--model', req.model,
     '--output-format', 'stream-json',
+    // Headless mode cannot ask; the agent's tool list bounds what this approves.
+    '--dangerously-skip-permissions',
     '--print-timeout', `${Math.ceil(timeoutMs / 1000)}s`,
   ];
   // Antigravity drops a cancelled turn itself, so resuming in place is safe.
@@ -124,6 +127,14 @@ async function* send(opts: CliOptions, req: SendRequest): AsyncGenerator<Adapter
       if (!sessionSent && ev.event === 'init' && typeof ev.conversation_id === 'string') {
         sessionSent = true;
         yield { type: 'session', sessionId: ev.conversation_id };
+      } else if (ev.event === 'step_update' && ev.step_update?.step_type === 'tool' && ev.step_update.state === 'ACTIVE') {
+        const tool = ev.step_update.tool_info ?? {};
+        if (tool.name === 'search_web') yield { type: 'activity', text: `Searching the web for "${tool.parameters?.query ?? ''}"` };
+        const url = tool.parameters?.Url;
+        if (tool.name === 'read_url_content' && typeof url === 'string') {
+          yield { type: 'activity', text: `Reading ${hostOf(url)}` };
+          yield { type: 'source', url };
+        }
       } else if (ev.event === 'step_update' && ev.step_update?.step_type === 'agent_response' && ev.step_update.text_delta) {
         yield { type: 'delta', text: String(ev.step_update.text_delta) };
       } else if (ev.event === 'result') {

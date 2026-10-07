@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { ModelOption } from '../../shared/types.js';
 import { classifyError } from './errors.js';
 import { runJsonl } from './process.js';
-import { DEFAULT_TIMEOUT_MS, type AdapterEvent, type CliOptions, type ProviderAdapter, type SendRequest } from './types.js';
+import { DEFAULT_TIMEOUT_MS, hostOf, type AdapterEvent, type CliOptions, type ProviderAdapter, type SendRequest } from './types.js';
 
 const FALLBACK_MODELS: ModelOption[] = [
   { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
@@ -52,6 +52,8 @@ async function* send(opts: CodexOptions, req: SendRequest): AsyncGenerator<Adapt
     '-c', 'sandbox_mode="read-only"',
     // Codex defaults every model to low verbosity, which suits a terminal, not prose.
     '-c', 'model_verbosity="high"',
+    // "cached" serves an index only; "live" can open the pages Sam sends.
+    '-c', 'web_search="live"',
     ...DISABLED_FEATURES.flatMap((f) => ['-c', `features.${f}=false`]),
   ];
   if (req.effort) common.push('-c', `model_reasoning_effort=${JSON.stringify(req.effort)}`);
@@ -82,12 +84,18 @@ async function* send(opts: CodexOptions, req: SendRequest): AsyncGenerator<Adapt
         const text = String(ev.item.text ?? '');
         yield { type: 'delta', text: texts.length ? `\n\n${text}` : text };
         texts.push(text);
+      } else if (ev.type === 'item.started' && ev.item?.type === 'web_search') {
+        yield { type: 'activity', text: 'Searching the web' };
+      } else if (ev.type === 'item.completed' && ev.item?.type === 'web_search' && ev.item.action?.type === 'open_page' && typeof ev.item.action.url === 'string') {
+        yield { type: 'activity', text: `Reading ${hostOf(ev.item.action.url)}` };
+        yield { type: 'source', url: ev.item.action.url };
       } else if (ev.type === 'item.completed' && ev.item?.type === 'error') {
         yield { type: 'warning', message: String(ev.item.message ?? '') };
       } else if (ev.type === 'error') {
         lastError = String(ev.message ?? '');
       } else if (ev.type === 'turn.completed') {
-        yield { type: 'done', text: texts.join('\n\n') };
+        // Earlier messages narrate tool use ("I'll open the page…"); the reply is the last one.
+        yield { type: 'done', text: texts.at(-1) ?? '' };
         return;
       } else if (ev.type === 'turn.failed') {
         const detail = [lastError, ev.error?.message].filter(Boolean).join('\n');

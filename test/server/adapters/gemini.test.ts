@@ -41,19 +41,20 @@ describe('gemini adapter', () => {
     ]);
   });
 
-  it('writes a tool-less agent carrying the prompt snapshot', async () => {
+  it('writes a web-reading agent carrying the prompt snapshot', async () => {
     const { adapter, req, workdir } = setup(OK_RUN);
     await collect(adapter.send(req()));
-    const agent = await readFile(join(workdir, '.agents', 'agents', 'consensus-abc123.md'), 'utf8');
-    expect(agent).toBe('---\nname: consensus-abc123\ndescription: Consensus prose participant.\ntools: []\n---\nYou are an experienced editor.\n');
-    expect(agentName('abc123')).toBe('consensus-abc123');
+    const agent = await readFile(join(workdir, '.agents', 'agents', 'consensus-abc123-web.md'), 'utf8');
+    expect(agent).toBe('---\nname: consensus-abc123-web\ndescription: Consensus prose participant.\ntools:\n  - read_url_content\n  - search_web\n  - view_file\n---\nYou are an experienced editor.\n');
+    expect(agentName('abc123')).toBe('consensus-abc123-web');
   });
 
   it('runs the agent with model and stream output, resuming by conversation', async () => {
     const { fake, adapter, req } = setup(OK_RUN);
     await collect(adapter.send(req({ sessionId: 'conv-0' })));
     const args = (await fake.record()).argv;
-    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123');
+    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123-web');
+    expect(args).toContain('--dangerously-skip-permissions');
     expect(args[args.indexOf('--model') + 1]).toBe('gemini-3.1-pro-high');
     expect(args[args.indexOf('--output-format') + 1]).toBe('stream-json');
     expect(args[args.indexOf('--conversation') + 1]).toBe('conv-0');
@@ -96,24 +97,35 @@ describe('gemini adapter', () => {
     writeFileSync(src, Buffer.from([9, 9]));
     await collect(adapter.send(req({ message: 'Thoughts?', images: [{ id: 'i1', name: 'hero.png', mime: 'image/png', path: src, threadId: 't9' }] })));
     const args = (await fake.record()).argv;
-    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123-viewer');
+    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123-web');
     expect(args.at(-1)).toBe('-p=Attached images. Use view_file to look at each one before replying:\n- attachments/t9/i1.png (hero.png)\n\nThoughts?');
     expect(await readFile(join(workdir, 'attachments', 't9', 'i1.png'))).toEqual(Buffer.from([9, 9]));
-    const agent = await readFile(join(workdir, '.agents', 'agents', 'consensus-abc123-viewer.md'), 'utf8');
-    expect(agent).toBe('---\nname: consensus-abc123-viewer\ndescription: Consensus prose participant.\ntools:\n  - view_file\n---\nYou are an experienced editor.\n');
   });
 
-  it('keeps the tool-less agent when there are no images', async () => {
-    const { fake, adapter, req } = setup(OK_RUN);
-    await collect(adapter.send(req()));
-    const args = (await fake.record()).argv;
-    expect(args[args.indexOf('--agent') + 1]).toBe('consensus-abc123');
-  });
   it('refuses a message too long for one command-line argument without starting agy', async () => {
     const { fake, adapter, req } = setup(OK_RUN);
     const events = await collect(adapter.send(req({ message: 'é'.repeat(500_000) })));
     expect(events).toEqual([{ type: 'error', error: { code: 'unknown', message: 'Too much text for Gemini in one message (about 900KB at most). Attach fewer or shorter files.' } }]);
     await expect(fake.record()).rejects.toThrow();
+  });
+  it('reports searches and opened pages', async () => {
+    const { adapter, req } = setup({
+      lines: [
+        { event: 'init', conversation_id: 'c' },
+        { event: 'step_update', step_update: { step_type: 'tool', state: 'ACTIVE', tool_name: 'search_web', tool_info: { name: 'search_web', parameters: { query: 'node lts' } } } },
+        { event: 'step_update', step_update: { step_type: 'tool', state: 'ACTIVE', tool_name: 'read_url_content', tool_info: { name: 'read_url_content', parameters: { Url: 'https://nodejs.org/en' } } } },
+        { event: 'step_update', step_update: { step_type: 'tool', state: 'ACTIVE', tool_name: 'view_file', tool_info: { name: 'view_file', parameters: { AbsolutePath: '/x/content.md' } } } },
+        { event: 'result', result: { status: 'SUCCESS', response: 'v24' } },
+      ],
+    });
+    const events = await collect(adapter.send(req()));
+    expect(events).toEqual([
+      { type: 'session', sessionId: 'c' },
+      { type: 'activity', text: 'Searching the web for "node lts"' },
+      { type: 'activity', text: 'Reading nodejs.org' },
+      { type: 'source', url: 'https://nodejs.org/en' },
+      { type: 'done', text: 'v24' },
+    ]);
   });
 });
 
