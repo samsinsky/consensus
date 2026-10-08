@@ -158,9 +158,16 @@ export function Composer({ thread, models, defaults, target, lockTarget, onTarge
             }}
           />
           {running ? (
-            <button className="send-btn stop" onClick={() => api.stop(thread.id, running.id).catch((e: Error) => setError(e.message))} title="Stop" aria-label="Stop">■</button>
+            <button className="send-btn stop" onClick={() => api.stop(thread.id, running.id).catch((e: Error) => setError(e.message))} title="Stop" aria-label="Stop">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+            </button>
           ) : (
-            <button className="send-btn" disabled={!canSend} onClick={send} title="Send (Cmd+Enter)" aria-label="Send">↑</button>
+            <button className="send-btn" disabled={!canSend} onClick={send} title="Send (Cmd+Enter)" aria-label="Send">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 19V5" />
+                <path d="m5 12 7-7 7 7" />
+              </svg>
+            </button>
           )}
         </div>
       </div>

@@ -119,18 +119,19 @@ button.danger { background: var(--error); border-color: var(--error); color: whi
 .input-wrap { position: relative; flex: 1; display: flex; }
 .input-wrap .attach { position: absolute; left: 6px; bottom: 7px; padding: 4px; z-index: 1; display: flex; color: var(--muted); }
 .input-wrap .attach:hover { color: var(--text); }
-.send-btn { position: absolute; right: 6px; bottom: 6px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--accent); border-color: var(--accent); color: white; font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.send-btn { position: absolute; right: 6px; bottom: 6px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--accent); border-color: var(--accent); color: white; display: flex; align-items: center; justify-content: center; }
 .send-btn:disabled { background: var(--line); border-color: var(--line); color: var(--muted); opacity: 1; }
-.send-btn.stop { background: var(--text); border-color: var(--text); color: var(--bg); font-size: 11px; }
+.send-btn.stop { background: var(--text); border-color: var(--text); color: var(--bg); }
 .field-col { display: flex; flex-direction: column; gap: 3px; }
 .field-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .sidebar { position: relative; overflow-x: hidden; }
 .resize-handle { position: absolute; top: 0; right: 0; width: 6px; height: 100%; cursor: col-resize; z-index: 5; }
 .resize-handle:hover, body.resizing .resize-handle { background: var(--accent); opacity: 0.4; }
 body.resizing { cursor: col-resize; user-select: none; }
-.thread-row { display: flex; align-items: center; }
-.thread-row .thread { flex: 1; min-width: 0; }
-.thread-delete { visibility: hidden; padding: 2px 8px; }
-.thread-row:hover .thread-delete, .thread-delete:focus { visibility: visible; }
+/* The x overlays the row's right end, so names use the full width until hover. */
+.thread-row { position: relative; }
+.thread-delete { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); padding: 2px 8px; display: none; }
+.thread-row:hover .thread-delete, .thread-delete:focus-visible { display: block; }
+.thread-row:hover .thread { padding-right: 30px; }
 .thread-confirm { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 13px; flex-wrap: wrap; }
 .thread-confirm button { padding: 3px 8px; font-size: 12px; }
