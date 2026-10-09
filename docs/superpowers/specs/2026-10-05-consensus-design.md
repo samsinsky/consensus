@@ -110,14 +110,29 @@ Adding a provider later means writing one adapter.
 ### Router
 
 - Sends each message only to the selected participant.
-- Builds the outgoing text by inlining quotes with the task and current state: the original request at the root of the forward chain, the text the forwarded reply was responding to, and the reply itself. Earlier reviewer opinions and Sam's in-between messages stay out, which limits anchoring on apparent consensus. The model never learns which provider wrote the quote:
+- Builds the outgoing text for a forwarded reply as a handoff (revised 2026-10-09). The **round** is Sam's run of messages to the forwarded reply's participant, back to his last message to someone else. The handoff carries:
+  1. A note: "Drafts below may include the previous writer's commentary. Judge the text on its merits."
+  2. **Original request:** the first message of the forward chain, with its attachments.
+  3. **Starting point:** the participant's own previous reply if it had one before the round; else the draft forwarded in at the round's start; else its first reply in the round.
+  4. **Requests during the round:** Sam's messages in the round, word for word, with any critiques he forwarded into them (the original request is not repeated).
+  5. **The forwarded reply**, marked "Feedback from another reviewer". The model never learns which provider wrote it.
+  6. Sam's new message.
 
   ```
+  Drafts below may include the previous writer's commentary. Judge the text on its merits.
+
   Original request:
   <request>…</request>
 
-  Text another reviewer was responding to:
-  <context>…</context>
+  Starting point:
+  <start>…</start>
+
+  Requests during the round:
+  <requests>
+  - Punchier
+  - Revise
+    <quoted>…critique forwarded in…</quoted>
+  </requests>
 
   Feedback from another reviewer:
   <quoted>…</quoted>
@@ -125,8 +140,7 @@ Adding a provider later means writing one adapter.
   <Sam's instruction>
   ```
 
-  The router derives each block from the data: the reply's prompt is Sam's last message to that participant before it; the context is that prompt's quotes; the original request is found by following quotes back to a prompt with none. Blocks with nothing to show are omitted. A richer history (Sam's messages along the chain, a "fresh eyes" or "quote only" toggle) is deferred until real use shows the need.
-
+  Blocks with nothing to show are omitted; a quote whose source cannot be traced goes as a bare quote. Other reviewers' replies outside the round stay out, which limits anchoring. A model summary of the round (measured at 2.4 to 4.2 seconds with Haiku) is deferred: Sam does not want the wait. Drafts keep their commentary for the same reason; the shared document will separate drafts from comments later.
 - Passes the participant's session ID, model, and effort to the adapter, streams events to the browser, and writes the result to the store.
 
 ### Thread store

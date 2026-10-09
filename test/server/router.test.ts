@@ -54,20 +54,26 @@ async function threadWithTwo() {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
+const HEADER = "Drafts below may include the previous writer's commentary. Judge the text on its merits.";
+
 describe('composeOutgoing', () => {
   it('returns the text alone when nothing is quoted', () => {
     expect(composeOutgoing('Tighten it', [])).toBe('Tighten it');
   });
 
-  it('adds the original request and the text the reply was responding to', () => {
-    expect(composeOutgoing('Rewrite it', [{ messageId: 'r2', text: 'Too vague' }], {
+  it('lays out a handoff: request, starting draft, requests during the round, latest reply', () => {
+    expect(composeOutgoing('Critique it', [{ messageId: 'r3', text: 'Draft v3' }], {
+      resolved: true,
       originalRequest: 'Write a headline',
-      contexts: ['Kitchens that run themselves'],
+      start: 'Draft v1',
+      requests: [{ text: 'Punchier', quotes: [] }, { text: 'Weigh this', quotes: ['Too vague'] }],
     })).toBe(
-      'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
-        'Text another reviewer was responding to:\n<context>\nKitchens that run themselves\n</context>\n\n' +
-        'Feedback from another reviewer:\n<quoted>\nToo vague\n</quoted>\n\n' +
-        'Rewrite it',
+      `${HEADER}\n\n` +
+        'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+        'Starting point:\n<start>\nDraft v1\n</start>\n\n' +
+        'Requests during the round:\n<requests>\n- Punchier\n- Weigh this\n  <quoted>Too vague</quoted>\n</requests>\n\n' +
+        'Feedback from another reviewer:\n<quoted>\nDraft v3\n</quoted>\n\n' +
+        'Critique it',
     );
   });
 
@@ -278,25 +284,66 @@ describe('Router forwarding context', () => {
     return { t, a, b, c, gemini, s1, s2 };
   }
 
-  it('forwards a direct reply with its original request and no context block', async () => {
-    const { t, b, s1 } = await chain();
-    await router.send(t.id, { to: b.id, text: 'Again', quotes: [{ messageId: s1.replyMessageId, text: 'Kitchens' }] }).catch(() => {});
+  it('forwards a direct reply with its original request only', async () => {
+    const { s2 } = await chain();
     expect(codex.requests[0].message).toBe(
-      'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+      `${HEADER}\n\n` +
+        'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nKitchens that run themselves\n</quoted>\n\n' +
         'What do you think?',
     );
+    expect(s2).toBeDefined();
   });
 
-  it('forwards a reply to a forward with the root request and what it responded to', async () => {
+  it('forwards a reply to a forward with the draft it started from and what was asked', async () => {
     const { t, c, gemini, s2 } = await chain();
     await router.send(t.id, { to: c.id, text: 'Rewrite with that in mind', quotes: [{ messageId: s2.replyMessageId, text: 'Too vague' }] });
     expect(gemini.requests[0].message).toBe(
-      'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
-        'Text another reviewer was responding to:\n<context>\nKitchens that run themselves\n</context>\n\n' +
+      `${HEADER}\n\n` +
+        'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+        'Starting point:\n<start>\nKitchens that run themselves\n</start>\n\n' +
+        'Requests during the round:\n<requests>\n- What do you think?\n</requests>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nToo vague\n</quoted>\n\n' +
         'Rewrite with that in mind',
     );
+  });
+
+  it('hands off a multi-turn round: first draft, every request, latest draft', async () => {
+    const { t, a, b } = await threadWithTwo();
+    const s1 = await router.send(t.id, { to: a.id, text: 'Write a headline' });
+    await reply(claude, s1.done, 'Draft v1');
+    const s2 = await router.send(t.id, { to: a.id, text: 'Punchier' });
+    await reply(claude, s2.done, 'Draft v2');
+    const s3 = await router.send(t.id, { to: a.id, text: 'Lead with cost' });
+    await reply(claude, s3.done, 'Draft v3');
+    await router.send(t.id, { to: b.id, text: 'Critique the latest', quotes: [{ messageId: s3.replyMessageId, text: 'Draft v3' }] });
+    expect(codex.requests[0].message).toBe(
+      `${HEADER}\n\n` +
+        'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+        'Starting point:\n<start>\nDraft v1\n</start>\n\n' +
+        'Requests during the round:\n<requests>\n- Punchier\n- Lead with cost\n</requests>\n\n' +
+        'Feedback from another reviewer:\n<quoted>\nDraft v3\n</quoted>\n\n' +
+        'Critique the latest',
+    );
+  });
+
+  it('includes critiques forwarded into the round and stops at the last switch of participant', async () => {
+    const { t, a, b } = await threadWithTwo();
+    const s1 = await router.send(t.id, { to: a.id, text: 'Write a headline' });
+    await reply(claude, s1.done, 'Draft v1');
+    const s2 = await router.send(t.id, { to: b.id, text: 'Critique', quotes: [{ messageId: s1.replyMessageId, text: 'Draft v1' }] });
+    await reply(codex, s2.done, 'Too vague');
+    const s3 = await router.send(t.id, { to: a.id, text: 'Revise', quotes: [{ messageId: s2.replyMessageId, text: 'Too vague' }] });
+    await reply(claude, s3.done, 'Draft v2');
+    const s4 = await router.send(t.id, { to: a.id, text: 'Shorter' });
+    await reply(claude, s4.done, 'Draft v3');
+    await router.send(t.id, { to: b.id, text: 'Better now?', quotes: [{ messageId: s4.replyMessageId, text: 'Draft v3' }] });
+    const sent = codex.requests.at(-1)!.message;
+    // Claude's own earlier draft is the starting point; the critique forwarded back to it is a request.
+    expect(sent).toContain('Starting point:\n<start>\nDraft v1\n</start>');
+    expect(sent).toContain('<requests>\n- Revise\n  <quoted>Too vague</quoted>\n- Shorter\n</requests>');
+    expect(sent).toContain('<request>\nWrite a headline\n</request>');
+    expect(sent).not.toContain('Draft v2');
   });
 
   it('follows a long chain back to the first request without including middle opinions', async () => {
@@ -306,7 +353,7 @@ describe('Router forwarding context', () => {
     await router.send(t.id, { to: a.id, text: 'Thoughts?', quotes: [{ messageId: s3.replyMessageId, text: 'Run every kitchen from one recipe' }] });
     const sent = claude.requests.at(-1)!.message;
     expect(sent).toContain('<request>\nWrite a headline\n</request>');
-    expect(sent).toContain('<context>\nToo vague\n</context>');
+    expect(sent).toContain('<start>\nToo vague\n</start>');
     expect(sent).toContain('<quoted>\nRun every kitchen from one recipe\n</quoted>');
     expect(sent).not.toContain('Kitchens that run themselves');
   });
@@ -380,7 +427,8 @@ describe('Router attachments', () => {
     await s1.done;
     await router.send(t.id, { to: b.id, text: 'Critique', quotes: [{ messageId: s1.replyMessageId, text: 'Kitchens that run themselves' }] });
     expect(codex.requests[0].message).toBe(
-      'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
+      `${HEADER}\n\n` +
+        'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
         '<attachment name="brief.md">\nAudience: CFOs\n</attachment>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nKitchens that run themselves\n</quoted>\n\n' +
         'Critique',

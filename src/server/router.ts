@@ -29,30 +29,39 @@ type Deps = {
 
 const UNTITLED = 'Untitled thread';
 
-/** Task plus current state for forwarded quotes; contexts line up with quotes by index. */
+/** What a forwarded reply needs: the task, where the round started, what was asked, and the reply itself. */
 export type ForwardContext = {
+  /** True when the quoted reply was traced back through the thread. */
+  resolved?: boolean;
   originalRequest?: string;
   originalAttachments?: Attachment[];
   /** Rendered text blocks for originalAttachments. */
   originalBlocks?: string[];
-  contexts: (string | undefined)[];
+  /** The draft the round began from, when the round had one. */
+  start?: string;
+  /** Sam's messages during the round, with any critiques he forwarded into them. */
+  requests?: { text: string; quotes: string[] }[];
 };
+
+export const HANDOFF_NOTE = "Drafts below may include the previous writer's commentary. Judge the text on its merits.";
 
 export function attachmentBlock(att: Attachment, text: string): string {
   const note = att.truncated ? `\n${truncationNote()}` : '';
   return `<attachment name="${att.name.replace(/"/g, "'")}">\n${text}${note}\n</attachment>`;
 }
 
-export function composeOutgoing(text: string, quotes: Quote[], ctx: ForwardContext = { contexts: [] }, attachmentBlocks: string[] = []): string {
+export function composeOutgoing(text: string, quotes: Quote[], ctx: ForwardContext = {}, attachmentBlocks: string[] = []): string {
   const blocks: string[] = [];
   if (quotes.length) {
+    if (ctx.resolved) blocks.push(HANDOFF_NOTE);
     if (ctx.originalRequest) blocks.push(`Original request:\n<request>\n${ctx.originalRequest}\n</request>`);
     blocks.push(...(ctx.originalBlocks ?? []));
-    quotes.forEach((q, i) => {
-      const context = ctx.contexts[i];
-      if (context) blocks.push(`Text another reviewer was responding to:\n<context>\n${context}\n</context>`);
-      blocks.push(`Feedback from another reviewer:\n<quoted>\n${q.text}\n</quoted>`);
-    });
+    if (ctx.start) blocks.push(`Starting point:\n<start>\n${ctx.start}\n</start>`);
+    if (ctx.requests?.length) {
+      const items = ctx.requests.map((r) => [`- ${r.text}`, ...r.quotes.map((q) => `  <quoted>${q}</quoted>`)].join('\n'));
+      blocks.push(`Requests during the round:\n<requests>\n${items.join('\n')}\n</requests>`);
+    }
+    for (const q of quotes) blocks.push(`Feedback from another reviewer:\n<quoted>\n${q.text}\n</quoted>`);
   }
   blocks.push(...attachmentBlocks);
   if (!blocks.length) return text;
@@ -70,17 +79,51 @@ function promptOf(thread: Thread, replyId: string): UserMessage | undefined {
     .find((m): m is UserMessage => m.kind === 'user' && m.to === reply.from);
 }
 
-/** Derives the original request and each quote's context, leaving earlier opinions out. */
+/**
+ * Builds the handoff for the first quote's reply. The round is Sam's run of messages to that
+ * participant, back to his last message to someone else.
+ */
 export function forwardContext(thread: Thread, quotes: Quote[]): ForwardContext {
-  let root: UserMessage | undefined;
-  const contexts = quotes.map((q) => {
-    const prompt = promptOf(thread, q.messageId);
-    if (!prompt) return undefined;
-    root ??= rootPrompt(thread, prompt);
-    const context = prompt.quotes.map((x) => x.text).join('\n\n');
-    return context || undefined;
-  });
-  return { originalRequest: root?.text.trim() || undefined, originalAttachments: root?.attachments ?? [], contexts };
+  for (const q of quotes) {
+    const replyIdx = thread.messages.findIndex((m) => m.id === q.messageId && m.kind === 'reply');
+    const last = promptOf(thread, q.messageId);
+    if (replyIdx < 0 || !last) continue;
+    const from = (thread.messages[replyIdx] as ReplyMessage).from;
+    const users = thread.messages.slice(0, thread.messages.indexOf(last) + 1).filter((m): m is UserMessage => m.kind === 'user');
+    const round: UserMessage[] = [];
+    for (let i = users.length - 1; i >= 0 && users[i].to === from; i--) round.unshift(users[i]);
+    const first = round[0];
+    const firstIdx = thread.messages.indexOf(first);
+    const root = rootPrompt(thread, first);
+
+    // Starting point: the participant's own previous version, else the draft forwarded in, else its first reply in the round.
+    const previous = lastReplyFrom(thread.messages.slice(0, firstIdx), from);
+    const forwardedIn = first.quotes.map((x) => x.text).join('\n\n');
+    const firstReply = round.length > 1 ? lastReplyFrom(thread.messages.slice(firstIdx, thread.messages.indexOf(round[1])), from) : undefined;
+    const start = previous ?? (forwardedIn || firstReply);
+    const startFromQuotes = !previous && !!forwardedIn;
+
+    const requests = round
+      .filter((m) => m !== root)
+      .map((m) => ({ text: m.text.trim(), quotes: m === first && startFromQuotes ? [] : m.quotes.map((x) => x.text) }))
+      .filter((r) => r.text || r.quotes.length);
+    return {
+      resolved: true,
+      originalRequest: root?.text.trim() || undefined,
+      originalAttachments: root?.attachments ?? [],
+      start: start || undefined,
+      requests,
+    };
+  }
+  return {};
+}
+
+function lastReplyFrom(messages: Thread['messages'], participantId: string): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.kind === 'reply' && m.from === participantId && m.status === 'done' && m.text) return m.text;
+  }
+  return undefined;
 }
 
 function rootPrompt(thread: Thread, prompt: UserMessage): UserMessage | undefined {
