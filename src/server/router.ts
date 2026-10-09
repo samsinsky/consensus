@@ -45,6 +45,14 @@ export type ForwardContext = {
 
 export const HANDOFF_NOTE = "Drafts below may include the previous writer's commentary. Judge the text on its merits.";
 
+/** Sent with every forward, so the receiver both judges the work and moves the copy forward. */
+export const FORWARD_TASK =
+  'What to do with this:\n' +
+  "1. Judge the other reviewer's work point by point. Say whether each point makes the copy better and why, in a sentence or two. Push back where it makes the copy worse.\n" +
+  "2. Write the full revised copy. Keep what you agree with, fix or drop what you don't, and follow my requests above.\n" +
+  '3. Close with two short lines: what you changed, and what you kept or rejected and why.\n\n' +
+  'If my note below asks for something different, follow the note.';
+
 export function attachmentBlock(att: Attachment, text: string): string {
   const note = att.truncated ? `\n${truncationNote()}` : '';
   return `<attachment name="${att.name.replace(/"/g, "'")}">\n${text}${note}\n</attachment>`;
@@ -62,10 +70,12 @@ export function composeOutgoing(text: string, quotes: Quote[], ctx: ForwardConte
       blocks.push(`Requests during the round:\n<requests>\n${items.join('\n')}\n</requests>`);
     }
     for (const q of quotes) blocks.push(`Feedback from another reviewer:\n<quoted>\n${q.text}\n</quoted>`);
+    blocks.push(FORWARD_TASK, ...attachmentBlocks);
+    if (text.trim()) blocks.push(`My note:\n${text}`);
+    return blocks.join('\n\n');
   }
-  blocks.push(...attachmentBlocks);
-  if (!blocks.length) return text;
-  return [...blocks, text].filter(Boolean).join('\n\n');
+  if (!attachmentBlocks.length) return text;
+  return [...attachmentBlocks, text].filter(Boolean).join('\n\n');
 }
 
 /** Sam's message that produced a reply: his last message to that participant before it. */

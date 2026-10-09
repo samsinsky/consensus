@@ -116,7 +116,8 @@ Adding a provider later means writing one adapter.
   3. **Starting point:** the participant's own previous reply if it had one before the round; else the draft forwarded in at the round's start; else its first reply in the round.
   4. **Requests during the round:** Sam's messages in the round, word for word, with any critiques he forwarded into them (the original request is not repeated).
   5. **The forwarded reply**, marked "Feedback from another reviewer". The model never learns which provider wrote it.
-  6. Sam's new message.
+  6. **What to do** (added 2026-10-09), so a forward always yields both a judgment and a revision whatever Sam types: judge the other reviewer's work point by point and push back where it makes the copy worse; write the full revised copy, following Sam's round requests; close with one line on what changed and one on what was kept or rejected and why. Sam's note takes priority if it asks for something else.
+  7. Sam's new message, labeled "My note:" (omitted when empty).
 
   ```
   Drafts below may include the previous writer's commentary. Judge the text on its merits.
@@ -137,6 +138,14 @@ Adding a provider later means writing one adapter.
   Feedback from another reviewer:
   <quoted>…</quoted>
 
+  What to do with this:
+  1. Judge the other reviewer's work point by point. …
+  2. Write the full revised copy. …
+  3. Close with two short lines: what you changed, and what you kept or rejected and why.
+
+  If my note below asks for something different, follow the note.
+
+  My note:
   <Sam's instruction>
   ```
 

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { AdapterEvent, ProviderAdapter, SendRequest } from '../../src/server/adapters/types.js';
 import { EventHub } from '../../src/server/hub.js';
 import { makePaths } from '../../src/server/paths.js';
-import { composeOutgoing, Router, RouterError } from '../../src/server/router.js';
+import { composeOutgoing, FORWARD_TASK, Router, RouterError } from '../../src/server/router.js';
 import { ThreadStore } from '../../src/server/store.js';
 import type { ProviderId, ThreadEvent } from '../../src/shared/types.js';
 import { AsyncQueue } from '../helpers/queue.js';
@@ -61,7 +61,7 @@ describe('composeOutgoing', () => {
     expect(composeOutgoing('Tighten it', [])).toBe('Tighten it');
   });
 
-  it('lays out a handoff: request, starting draft, requests during the round, latest reply', () => {
+  it('lays out a handoff: request, starting point, requests during the round, latest reply', () => {
     expect(composeOutgoing('Critique it', [{ messageId: 'r3', text: 'Draft v3' }], {
       resolved: true,
       originalRequest: 'Write a headline',
@@ -73,15 +73,26 @@ describe('composeOutgoing', () => {
         'Starting point:\n<start>\nDraft v1\n</start>\n\n' +
         'Requests during the round:\n<requests>\n- Punchier\n- Weigh this\n  <quoted>Too vague</quoted>\n</requests>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nDraft v3\n</quoted>\n\n' +
-        'Critique it',
+        `${FORWARD_TASK}\n\nMy note:\nCritique it`,
     );
+  });
+
+  it('asks the receiver to judge and revise, and leaves out an empty note', () => {
+    expect(FORWARD_TASK).toBe(
+      'What to do with this:\n' +
+        "1. Judge the other reviewer's work point by point. Say whether each point makes the copy better and why, in a sentence or two. Push back where it makes the copy worse.\n" +
+        "2. Write the full revised copy. Keep what you agree with, fix or drop what you don't, and follow my requests above.\n" +
+        '3. Close with two short lines: what you changed, and what you kept or rejected and why.\n\n' +
+        'If my note below asks for something different, follow the note.',
+    );
+    expect(composeOutgoing('', [{ messageId: 'm', text: 'Draft' }])).toBe(`Feedback from another reviewer:\n<quoted>\nDraft\n</quoted>\n\n${FORWARD_TASK}`);
   });
 
   it('wraps each quote without naming its source', () => {
     expect(composeOutgoing('Critique these', [{ messageId: 'm1', text: 'Option A' }, { messageId: 'm2', text: 'Option B' }])).toBe(
       'Feedback from another reviewer:\n<quoted>\nOption A\n</quoted>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nOption B\n</quoted>\n\n' +
-        'Critique these',
+        `${FORWARD_TASK}\n\nMy note:\nCritique these`,
     );
   });
 });
@@ -290,7 +301,7 @@ describe('Router forwarding context', () => {
       `${HEADER}\n\n` +
         'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nKitchens that run themselves\n</quoted>\n\n' +
-        'What do you think?',
+        `${FORWARD_TASK}\n\nMy note:\nWhat do you think?`,
     );
     expect(s2).toBeDefined();
   });
@@ -304,7 +315,7 @@ describe('Router forwarding context', () => {
         'Starting point:\n<start>\nKitchens that run themselves\n</start>\n\n' +
         'Requests during the round:\n<requests>\n- What do you think?\n</requests>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nToo vague\n</quoted>\n\n' +
-        'Rewrite with that in mind',
+        `${FORWARD_TASK}\n\nMy note:\nRewrite with that in mind`,
     );
   });
 
@@ -323,7 +334,7 @@ describe('Router forwarding context', () => {
         'Starting point:\n<start>\nDraft v1\n</start>\n\n' +
         'Requests during the round:\n<requests>\n- Punchier\n- Lead with cost\n</requests>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nDraft v3\n</quoted>\n\n' +
-        'Critique the latest',
+        `${FORWARD_TASK}\n\nMy note:\nCritique the latest`,
     );
   });
 
@@ -361,7 +372,7 @@ describe('Router forwarding context', () => {
   it('falls back to the bare quote when its source is unknown', async () => {
     const { t, b } = await threadWithTwo();
     await router.send(t.id, { to: b.id, text: 'Hm', quotes: [{ messageId: 'gone', text: 'Old text' }] });
-    expect(codex.requests[0].message).toBe('Feedback from another reviewer:\n<quoted>\nOld text\n</quoted>\n\nHm');
+    expect(codex.requests[0].message).toBe(`Feedback from another reviewer:\n<quoted>\nOld text\n</quoted>\n\n${FORWARD_TASK}\n\nMy note:\nHm`);
   });
 });
 
@@ -431,7 +442,7 @@ describe('Router attachments', () => {
         'Original request:\n<request>\nWrite a headline\n</request>\n\n' +
         '<attachment name="brief.md">\nAudience: CFOs\n</attachment>\n\n' +
         'Feedback from another reviewer:\n<quoted>\nKitchens that run themselves\n</quoted>\n\n' +
-        'Critique',
+        `${FORWARD_TASK}\n\nMy note:\nCritique`,
     );
     expect(codex.requests[0].images?.map((i) => i.id)).toEqual([logo.id]);
   });
