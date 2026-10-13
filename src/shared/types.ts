@@ -93,16 +93,85 @@ export type ModelChangeMessage = {
 
 export type Message = UserMessage | ReplyMessage | ModelChangeMessage;
 
+export type ThreadKind = 'chat' | 'doc';
+
+export type Stance = 'agree' | 'disagree' | 'your_call';
+
+export type ProposalStatus = 'open' | 'accepted' | 'rejected' | 'not_chosen' | 'dismissed';
+
+export type ProposalReply = {
+  /** 'user' for Sam, else a participant id. */
+  from: string;
+  stance?: Stance;
+  text: string;
+  round?: number;
+  at: string;
+};
+
+export type Proposal = {
+  /** "P1", "P2", … per document. */
+  id: string;
+  round: number;
+  /** Participant ids; several when identical proposals merged. */
+  authors: string[];
+  quote: string;
+  /** Up to 32 normalized characters before and after the quote in the round snapshot. */
+  prefix: string;
+  suffix: string;
+  replacement: string;
+  reason: string;
+  status: ProposalStatus;
+  resolvedAt?: string;
+  replies: ProposalReply[];
+};
+
+export type RoundNote = {
+  status: 'running' | 'done' | 'stopped' | 'error';
+  note?: string;
+  /** The participant's full prose answer. */
+  answer?: string;
+  /** Proposals that failed the quote check. */
+  rejected?: { quote: string; reason: string }[];
+  error?: { code: ErrorCode | 'parse'; message: string; fix?: string };
+};
+
+export type Round = {
+  /** 1-based. */
+  n: number;
+  sentAt: string;
+  /** Markdown as sent. */
+  snapshot: string;
+  participants: string[];
+  notes: Record<string, RoundNote>;
+};
+
+export type DocState = {
+  brief: string;
+  briefAttachments?: Attachment[];
+  markdown: string;
+  savedAt: string;
+  /** Bumped when the server replaces the text (restore), so the editor reloads and stale saves are refused. */
+  revision: number;
+  /** Participant ids in the next round. */
+  included: string[];
+  rounds: Round[];
+  proposals: Proposal[];
+  nextProposal: number;
+};
+
 export type Thread = {
   id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
+  /** Absent means chat. */
+  kind?: ThreadKind;
+  doc?: DocState;
   participants: Participant[];
   messages: Message[];
 };
 
-export type ThreadSummary = { id: string; title: string; updatedAt: string };
+export type ThreadSummary = { id: string; title: string; updatedAt: string; kind?: ThreadKind };
 
 export type ProviderDefaults = { model: string; effort?: string };
 
