@@ -36,11 +36,6 @@ export function applyReplacement(editor: Editor, range: { from: number; to: numb
   else editor.chain().deleteRange(range).run();
 }
 
-/** TipTap writes & and < as entities; the saved document keeps them as typed. */
-export function cleanMarkdown(md: string): string {
-  return md.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-}
-
 function textNode(text: string, marks: MarkJson[]): JSONContent {
   return marks.length ? { type: 'text', text, marks: marks.map((m) => ({ ...m })) } : { type: 'text', text };
 }

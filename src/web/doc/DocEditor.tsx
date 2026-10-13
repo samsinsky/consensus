@@ -3,7 +3,6 @@ import { Markdown } from '@tiptap/markdown';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useRef } from 'react';
-import { cleanMarkdown } from './inlineMarkdown.js';
 
 export function docExtensions(): Extensions {
   return [StarterKit.configure({ link: { openOnClick: false } }), Markdown];
@@ -26,7 +25,7 @@ export function DocEditor({ markdown, revision, onChange, onReady, onPick, exten
     extensions: [...docExtensions(), ...extensions],
     content: markdown,
     contentType: 'markdown',
-    onUpdate: ({ editor: ed }) => change.current(cleanMarkdown(ed.getMarkdown())),
+    onUpdate: ({ editor: ed }) => change.current(ed.getMarkdown()),
   });
 
   useEffect(() => {

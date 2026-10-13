@@ -5,7 +5,7 @@ import { findAll, locate, normalize, toSource } from '../../src/shared/anchor.js
 import { markdownToPlain } from '../../src/shared/markdownText.js';
 import { docExtensions } from '../../src/web/doc/DocEditor.js';
 import { editorIndex } from '../../src/web/doc/editorIndex.js';
-import { applyReplacement, cleanMarkdown } from '../../src/web/doc/inlineMarkdown.js';
+import { applyReplacement } from '../../src/web/doc/inlineMarkdown.js';
 
 let editor: Editor | undefined;
 afterEach(() => editor?.destroy());
@@ -45,7 +45,7 @@ describe('applyReplacement', () => {
     const index = editorIndex(ed.state.doc);
     applyReplacement(ed, toSource(index, locate(index, { quote: 'gone deep on', prefix: '', suffix: '' })!), 'gained **hands-on** experience with');
     expect(ed.getHTML()).toBe('<p>I have gained <strong>hands-on</strong> experience with LLMs.</p>');
-    expect(cleanMarkdown(ed.getMarkdown())).toBe('I have gained **hands-on** experience with LLMs.');
+    expect(ed.getMarkdown()).toBe('I have gained **hands-on** experience with LLMs.');
   });
 
   it('keeps the formatting of the words it replaces, and deletes on an empty replacement', () => {
@@ -56,5 +56,19 @@ describe('applyReplacement', () => {
     index = editorIndex(ed.state.doc);
     applyReplacement(ed, toSource(index, locate(index, { quote: 'daily', prefix: '', suffix: '' })!), '');
     expect(ed.getText()).toBe('I deliver .');
+  });
+});
+
+describe('saved Markdown round trip', () => {
+  it('keeps angle brackets and entities as typed', () => {
+    const original = 'if a<b and c>d, Vec<T> & &copy;';
+    const typed = make('');
+    typed.commands.insertContent({ type: 'text', text: original });
+    const saved = typed.getMarkdown();
+    const text = editorIndex(editor!.state.doc).text;
+    editor!.destroy();
+    const again = make(saved);
+    expect(again.getText()).toBe(original);
+    expect(normalize(markdownToPlain(saved))).toBe(text);
   });
 });

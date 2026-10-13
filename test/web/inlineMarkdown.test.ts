@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanMarkdown, inlineMarkdown } from '../../src/web/doc/inlineMarkdown.js';
+import { inlineMarkdown } from '../../src/web/doc/inlineMarkdown.js';
 
 describe('inlineMarkdown', () => {
   it('turns bold, italic and links into marks', () => {
@@ -26,11 +26,5 @@ describe('inlineMarkdown', () => {
 
   it('returns nothing for an empty replacement', () => {
     expect(inlineMarkdown('')).toEqual([]);
-  });
-});
-
-describe('cleanMarkdown', () => {
-  it('undoes the entity escaping in saved Markdown', () => {
-    expect(cleanMarkdown('two &amp; three, 1 &lt; 2 &gt; 0')).toBe('two & three, 1 < 2 > 0');
   });
 });
