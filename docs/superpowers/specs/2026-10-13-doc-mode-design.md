@@ -1,6 +1,6 @@
 # Consensus doc mode: design
 
-Date: 2026-10-13. Status: approved in conversation, pending Sam's review of this spec.
+Date: 2026-10-13. Status: implemented 2026-10-13.
 Builds on `2026-10-05-consensus-design.md` (the "Shared document with comment threads" future-work item).
 
 ## Purpose

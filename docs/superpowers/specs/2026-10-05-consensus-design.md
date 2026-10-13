@@ -183,6 +183,7 @@ Writes go to a temp file and rename into place, so a crash never corrupts a thre
 
 ### Layout
 
+- A thread can be a doc instead of a chat: see 2026-10-13-doc-mode-design.md.
 - **Threads sidebar:** list of threads, newest first, plus **New thread**.
 - **Main area:** the active thread in Timeline view (default) or Panes view.
 
