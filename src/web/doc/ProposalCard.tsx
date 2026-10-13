@@ -82,9 +82,17 @@ export function ProposalCard({ group, shown, participants, focused, onFocus, onP
 }
 
 export function StaleCard({ proposal, participants, onDismiss }: { proposal: Proposal; participants: Participant[]; onDismiss: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button className="card stale stale-line" onClick={() => setOpen(true)}>
+        <Author p={proposal} all={participants} /> <span className="tag">Text changed</span>
+      </button>
+    );
+  }
   return (
     <div className="card stale">
-      <div className="card-head"><Author p={proposal} all={participants} /> <span className="tag">Text changed</span></div>
+      <div className="card-head"><span onClick={() => setOpen(false)} title="Collapse"><Author p={proposal} all={participants} /> <span className="tag">Text changed</span></span></div>
       <p className="option-text">"{proposal.quote}" → "{proposal.replacement}"</p>
       <div className="card-actions"><button onClick={() => onDismiss(proposal.id)}>Dismiss</button></div>
     </div>

@@ -30,6 +30,7 @@ afterEach(() => {
   host.remove();
 });
 const click = (el: Element) => act(() => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+const expand = () => { const line = host.querySelector('.note-line, .stale-line'); if (line) click(line); };
 const button = (label: string) => [...host.querySelectorAll('button')].find((b) => b.textContent === label)!;
 
 describe('ProposalCard', () => {
@@ -73,6 +74,10 @@ describe('ProposalCard', () => {
     const onDismiss = vi.fn();
     act(() => root.render(<StaleCard proposal={prop({})} participants={people} onDismiss={onDismiss} />));
     expect(host.textContent).toContain('Text changed');
+    expect(host.textContent).not.toContain('gone deep on');
+    expect(button('Dismiss')).toBeUndefined();
+    expand();
+    expect(host.textContent).toContain('gone deep on');
     expect(host.querySelectorAll('button')).toHaveLength(1);
     click(button('Dismiss'));
     expect(onDismiss).toHaveBeenCalledWith('P1');
@@ -85,6 +90,7 @@ describe('NoteCard', () => {
   it('shows the latest note, the full answer on request, and quotes that failed', () => {
     const r = round({ notes: { a: { status: 'done', note: 'Tight draft.', answer: 'Full **answer**.', rejected: [{ quote: 'ship fast', reason: 'matched 2 places' }] } } });
     act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={[r]} onRetry={() => {}} />));
+    expand();
     expect(host.textContent).toContain('Tight draft.');
     expect(host.textContent).toContain('"ship fast" (matched 2 places)');
     click(button('Full answer'));
@@ -96,9 +102,39 @@ describe('NoteCard', () => {
     act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={[round({ notes: { a: { status: 'running' } } })]} activity="Reading x.com" onRetry={onRetry} />));
     expect(host.textContent).toContain('Reading x.com…');
     act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={[round({ notes: { a: { status: 'error', error: { code: 'parse', message: 'The answer was missing the JSON block.' }, answer: 'No JSON.' } } })]} onRetry={onRetry} />));
+    expect(host.querySelector('.note-line')?.textContent).toContain('Error');
+    expand();
     expect(host.textContent).toContain('The answer was missing the JSON block.');
     click(button('Retry'));
     expect(onRetry).toHaveBeenCalled();
+  });
+});
+
+describe('NoteCard collapsed line', () => {
+  const round = (over: Partial<Round>): Round => ({ n: 1, sentAt: '2026-10-13T12:00:00Z', snapshot: '', participants: ['a'], notes: {}, ...over });
+  const line = (r: Round, activity?: string) => {
+    act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={[r]} activity={activity} onRetry={() => {}} />));
+    return host.querySelector('.note-line')!;
+  };
+
+  it('is one line by default: label and the start of the note, expanding on click', () => {
+    const long = 'x'.repeat(100);
+    const el = line(round({ notes: { a: { status: 'done', note: long } } }));
+    expect(el.textContent).toContain('Claude · opus high');
+    expect(el.textContent).toContain('x'.repeat(80) + '…');
+    expect(el.textContent).not.toContain('x'.repeat(81));
+    expect(host.querySelector('.card-head')).toBeNull();
+    click(el);
+    expect(host.textContent).toContain(long);
+    expect(host.querySelector('.card-head')).not.toBeNull();
+  });
+
+  it('keeps a short note whole and shows status words while running, stopped or failed', () => {
+    expect(line(round({ notes: { a: { status: 'done', note: 'Tight.' } } })).textContent).toContain('Tight.');
+    expect(line(round({ notes: { a: { status: 'done', note: 'Tight.' } } })).textContent).not.toContain('…');
+    expect(line(round({ notes: { a: { status: 'running' } } })).textContent).toContain('Reviewing…');
+    expect(line(round({ notes: { a: { status: 'running' } } }), 'Reading x.com').textContent).toContain('Reading x.com…');
+    expect(line(round({ notes: { a: { status: 'stopped' } } })).textContent).toContain('Stopped');
   });
 });
 
