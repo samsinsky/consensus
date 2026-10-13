@@ -9,18 +9,35 @@ export function Margin({ header, footer, items, focused, topOf, version }: Props
   const area = useRef<HTMLDivElement>(null);
   const [tops, setTops] = useState<Record<string, number>>({});
 
-  useLayoutEffect(() => {
+  const slots = useRef(new Map<string, HTMLElement>());
+  const measure = () => {
     const el = area.current;
     if (!el) return;
     const areaTop = el.getBoundingClientRect().top;
     const measured = items.map((i) => ({
       id: i.key,
       top: topOf(i.anchor) - areaTop,
-      height: (el.querySelector(`[data-card="${CSS.escape(i.key)}"]`) as HTMLElement | null)?.offsetHeight ?? 0,
+      height: slots.current.get(i.key)?.offsetHeight ?? 0,
     }));
     const next = stackCards(measured, focused);
     setTops((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
-  });
+  };
+  // Always call the latest closure, so the observer never measures with stale items.
+  const latest = useRef(measure);
+  latest.current = measure;
+
+  useLayoutEffect(measure);
+
+  // Cards grow on their own (reply errors, expanded answers), and the window or fonts can change: re-measure on any slot resize.
+  const keys = items.map((i) => i.key).join('\u0000');
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => latest.current());
+    slots.current.forEach((slot) => ro.observe(slot));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [keys]);
 
   const bottom = Math.max(0, ...items.map((i) => (tops[i.key] ?? 0) + 200));
   return (
@@ -28,7 +45,11 @@ export function Margin({ header, footer, items, focused, topOf, version }: Props
       <div className="notes">{header}</div>
       <div className="cards" ref={area} style={{ minHeight: bottom }} data-version={version}>
         {items.map((i) => (
-          <div key={i.key} data-card={i.key} className="card-slot" style={{ top: tops[i.key] ?? 0 }}>
+          <div
+            key={i.key}
+            data-card={i.key}
+            ref={(n) => { if (n) slots.current.set(i.key, n); else slots.current.delete(i.key); }}
+            className="card-slot" style={{ top: tops[i.key] ?? 0 }}>
             {i.node}
           </div>
         ))}
