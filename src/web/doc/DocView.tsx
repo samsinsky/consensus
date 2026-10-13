@@ -44,25 +44,34 @@ export function DocView({ thread, activity, models, defaults }: Props) {
   const pending = useRef<Pending>({});
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const revision = useRef(doc.revision);
+  const inFlight = useRef<Promise<boolean>>(undefined);
   const filePicker = useRef<HTMLInputElement>(null);
 
-  /** Saves queued edits now. Returns false when the save failed. */
+  /** Saves queued edits now, after any save already in flight. Returns false when a save failed. */
   const flush = useCallback(async (): Promise<boolean> => {
     clearTimeout(timer.current);
-    const body = pending.current;
-    if (body.markdown === undefined && body.brief === undefined) return true;
-    pending.current = {};
-    setSaveState('saving');
-    try {
-      await api.saveDoc(thread.id, { revision: revision.current, ...body });
-      setSaveState('saved');
-      return true;
-    } catch (e) {
-      pending.current = { ...body, ...pending.current };
-      setSaveState('error');
-      setError((e as Error).message);
-      return false;
-    }
+    const previous = inFlight.current;
+    const run = (async (): Promise<boolean> => {
+      if (previous && !(await previous)) return false;
+      const body = pending.current;
+      if (body.markdown === undefined && body.brief === undefined) return true;
+      pending.current = {};
+      const sentAt = revision.current;
+      setSaveState('saving');
+      try {
+        await api.saveDoc(thread.id, { revision: sentAt, ...body });
+        setSaveState('saved');
+        return true;
+      } catch (e) {
+        // Keep the edits only while they still apply; a restore replaced the text they were made against.
+        if (revision.current === sentAt) pending.current = { ...body, ...pending.current };
+        setSaveState('error');
+        setError((e as Error).message);
+        return false;
+      }
+    })();
+    inFlight.current = run;
+    return run;
   }, [thread.id]);
 
   const queue = (patch: Pending) => {

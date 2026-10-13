@@ -96,4 +96,67 @@ describe('DocView', () => {
     await act(async () => click(button('Restore')));
     expect(api.restore).toHaveBeenCalledWith('t', 1);
   });
+  const typeBrief = (text: string) => {
+    const brief = host.querySelector('textarea.brief-input') as HTMLTextAreaElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(brief, text);
+      brief.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+
+  it('Send waits for a save already in flight', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveSave!: () => void;
+      vi.mocked(api.saveDoc).mockImplementationOnce(() => new Promise<void>((r) => { resolveSave = r; }) as any);
+      await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
+      typeBrief('edited');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(api.saveDoc).toHaveBeenCalledTimes(1);
+      await act(async () => click(host.querySelector('.review-send')!));
+      expect(api.startRound).not.toHaveBeenCalled();
+      await act(async () => { resolveSave(); await Promise.resolve(); });
+      expect(api.startRound).toHaveBeenCalledWith('t');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Send does not start a round when the save in flight fails', async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectSave!: (e: Error) => void;
+      vi.mocked(api.saveDoc).mockImplementationOnce(() => new Promise<void>((_, r) => { rejectSave = r; }) as any);
+      await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
+      typeBrief('edited');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      await act(async () => click(host.querySelector('.review-send')!));
+      await act(async () => { rejectSave(new Error('busy')); await Promise.resolve(); });
+      expect(api.startRound).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a save that fails after a restore does not bring the old text back', async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectSave!: (e: Error) => void;
+      vi.mocked(api.saveDoc).mockImplementationOnce(() => new Promise<void>((_, r) => { rejectSave = r; }) as any);
+      await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
+      typeBrief('old edit');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      click(host.querySelector('button[title="History"]')!);
+      click(button('Round 1 · ' + new Date('2026-10-13T12:00:00Z').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })));
+      await act(async () => click(button('Restore')));
+      const restored = thread();
+      restored.doc!.revision = 1;
+      await act(async () => root.render(<DocView thread={restored} activity={{}} models={models} defaults={defaults} />));
+      await act(async () => { rejectSave(new Error('busy')); await Promise.resolve(); });
+      await act(async () => click(host.querySelector('.review-send')!));
+      expect(api.saveDoc).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
