@@ -41,6 +41,23 @@ async function docWithTwo(markdown = 'I make systems simple. I have gone deep on
 }
 
 describe('DocService rounds', () => {
+  it('ends the round and frees the participant when handling an answer throws', async () => {
+    const { t, a } = await docWithTwo();
+    t.doc!.included = [a.id];
+    const { done } = await docs.startRound(t.id);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    (t.doc!.rounds[0] as { snapshot: unknown }).snapshot = null;
+    answer(claude, json({ note: 'ok' }));
+    await done;
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+    expect(router.roundRunning(t.id)).toBe(false);
+    expect(router.tryReserve(a.id)).toBe(true);
+    router.release(a.id);
+    expect(t.doc!.rounds[0].notes[a.id].status).toBe('error');
+    await expect(docs.startRound(t.id)).resolves.toMatchObject({ round: 2 });
+  });
+
   it('sends the same snapshot to every included participant at once', async () => {
     const { t } = await docWithTwo();
     const { round } = await docs.startRound(t.id);

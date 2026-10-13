@@ -184,7 +184,8 @@ export class DocService {
       throw e;
     }
     const done = Promise.all(people.map((p) => this.review(thread, p, round, messages.get(p.id)!, controller.signal)))
-      .then(() => this.finish(threadId, []));
+      .then(() => {})
+      .finally(() => this.finish(threadId, []));
     return { round: n, done };
   }
 
@@ -217,7 +218,7 @@ export class DocService {
       this.finish(threadId, [p]);
       throw e;
     }
-    const done = this.review(thread, p, round, messages.get(p.id)!, controller.signal).then(() => this.finish(threadId, []));
+    const done = this.review(thread, p, round, messages.get(p.id)!, controller.signal).finally(() => this.finish(threadId, []));
     return { done };
   }
 
@@ -254,33 +255,40 @@ export class DocService {
     const hooks = { onActivity: (text: string) => this.router.emit(thread.id, { type: 'activity', messageId: `doc:${p.id}`, text }) };
     const known = new Set(thread.doc.proposals.filter((x) => x.status === 'open').map((x) => x.id));
     const note: RoundNote = { status: 'running' };
-    let result = await this.router.runTurn(p, message.text, message.images, signal, hooks);
-    if (result.status === 'done') {
-      note.answer = result.text;
-      let parsed = parseAnswer(result.text, known);
-      if (!parsed.ok) {
-        const repair = await this.router.runTurn(p, repairMessage(parsed.reason), [], signal, hooks);
-        if (repair.status === 'done') parsed = parseAnswer(repair.text, known);
-        else result = repair;
-      }
+    try {
+      let result = await this.router.runTurn(p, message.text, message.images, signal, hooks);
       if (result.status === 'done') {
-        if (parsed.ok) {
-          note.status = 'done';
-          note.note = parsed.value.note;
-          note.rejected = ingest(thread.doc, p.id, round, parsed.value, new Date().toISOString());
-        } else {
-          note.status = 'error';
-          note.error = { code: 'parse', message: `The answer ${parsed.reason}.` };
+        note.answer = result.text;
+        let parsed = parseAnswer(result.text, known);
+        if (!parsed.ok) {
+          const repair = await this.router.runTurn(p, repairMessage(parsed.reason), [], signal, hooks);
+          if (repair.status === 'done') parsed = parseAnswer(repair.text, known);
+          else result = repair;
+        }
+        if (result.status === 'done') {
+          if (parsed.ok) {
+            note.status = 'done';
+            note.note = parsed.value.note;
+            note.rejected = ingest(thread.doc, p.id, round, parsed.value, new Date().toISOString());
+          } else {
+            note.status = 'error';
+            note.error = { code: 'parse', message: `The answer ${parsed.reason}.` };
+          }
         }
       }
-    }
-    if (result.status === 'stopped') note.status = 'stopped';
-    if (result.status === 'error') {
+      if (result.status === 'stopped') note.status = 'stopped';
+      if (result.status === 'error') {
+        note.status = 'error';
+        note.error = result.error;
+      }
+    } catch (e) {
+      console.error('consensus: could not read the review', e);
       note.status = 'error';
-      note.error = result.error;
+      note.error = { code: 'parse', message: `Could not read the answer: ${(e as Error).message}` };
+    } finally {
+      round.notes[p.id] = note;
+      this.router.release(p.id);
     }
-    round.notes[p.id] = note;
-    this.router.release(p.id);
     if (this.router.isDeleted(thread.id)) return;
     try {
       await this.router.save(thread);
