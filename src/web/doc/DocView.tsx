@@ -52,7 +52,7 @@ export function DocView({ thread, activity, models, defaults }: Props) {
     clearTimeout(timer.current);
     const previous = inFlight.current;
     const run = (async (): Promise<boolean> => {
-      if (previous && !(await previous)) return false;
+      if (previous) await previous;
       const body = pending.current;
       if (body.markdown === undefined && body.brief === undefined) return true;
       pending.current = {};

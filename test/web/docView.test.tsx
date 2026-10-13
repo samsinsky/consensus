@@ -46,6 +46,7 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   vi.clearAllMocks();
+  vi.mocked(api.saveDoc).mockReset().mockResolvedValue(undefined);
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -127,6 +128,7 @@ describe('DocView', () => {
     try {
       let rejectSave!: (e: Error) => void;
       vi.mocked(api.saveDoc).mockImplementationOnce(() => new Promise<void>((_, r) => { rejectSave = r; }) as any);
+      vi.mocked(api.saveDoc).mockRejectedValueOnce(new Error('still busy'));
       await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
       typeBrief('edited');
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
@@ -155,6 +157,24 @@ describe('DocView', () => {
       await act(async () => { rejectSave(new Error('busy')); await Promise.resolve(); });
       await act(async () => click(host.querySelector('.review-send')!));
       expect(api.saveDoc).toHaveBeenCalledTimes(1);
+      expect(api.startRound).toHaveBeenCalledWith('t');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a failed save is retried: Send saves again and starts the round once it succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(api.saveDoc).mockRejectedValueOnce(new Error('busy'));
+      await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
+      typeBrief('edited');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(host.textContent).toContain('Not saved');
+      await act(async () => click(host.querySelector('.review-send')!));
+      expect(api.saveDoc).toHaveBeenCalledTimes(2);
+      expect(api.saveDoc).toHaveBeenLastCalledWith('t', { revision: 0, brief: 'edited' });
+      expect(api.startRound).toHaveBeenCalledWith('t');
+      expect(host.textContent).not.toContain('Not saved');
     } finally {
       vi.useRealTimers();
     }
