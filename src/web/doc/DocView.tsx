@@ -201,6 +201,8 @@ export function DocView({ thread, activity, models, defaults }: Props) {
           all={thread.participants}
           rounds={doc.rounds.filter((r) => r.participants.includes(p.id))}
           activity={activity[`doc:${p.id}`]}
+          roundRunning={running}
+          latestRound={latest?.n ?? 0}
           onRetry={() => attempt(() => api.retryReview(thread.id, p.id))}
         />
       ))}

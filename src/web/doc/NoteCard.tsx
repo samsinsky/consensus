@@ -3,7 +3,7 @@ import Markdown from 'react-markdown';
 import { participantLabel } from '../../shared/labels.js';
 import type { Participant, Round } from '../../shared/types.js';
 
-type Props = { participant: Participant; all: Participant[]; rounds: Round[]; activity?: string; onRetry: () => void };
+type Props = { participant: Participant; all: Participant[]; rounds: Round[]; activity?: string; roundRunning: boolean; latestRound: number; onRetry: () => void };
 
 const PREVIEW = 80;
 
@@ -16,14 +16,15 @@ function summary(note: { status: string; note?: string }, activity?: string): st
 }
 
 /** One participant's overall note, latest round first, with earlier rounds a pick away. */
-export function NoteCard({ participant, all, rounds, activity, onRetry }: Props) {
+export function NoteCard({ participant, all, rounds, activity, roundRunning, latestRound, onRetry }: Props) {
   const [picked, setPicked] = useState<number>();
   const [showAnswer, setShowAnswer] = useState(false);
   const [open, setOpen] = useState(false);
   const round = rounds.find((r) => r.n === picked) ?? rounds.at(-1);
   const note = round?.notes[participant.id];
   if (!round || !note) return null;
-  const latest = round === rounds.at(-1);
+  const canRetry = round.n === latestRound;
+  const retry = <button disabled={roundRunning} title={roundRunning ? 'Wait for the other reviews to finish' : undefined} onClick={onRetry}>Retry</button>;
 
   if (!open) {
     return (
@@ -56,10 +57,10 @@ export function NoteCard({ participant, all, rounds, activity, onRetry }: Props)
         <div className="error">
           <p>{note.error.message}</p>
           {note.error.fix && <p>Fix: <code>{note.error.fix}</code></p>}
-          {latest && <button onClick={onRetry}>Retry</button>}
+          {canRetry && retry}
         </div>
       )}
-      {note.status === 'stopped' && latest && <button onClick={onRetry}>Retry</button>}
+      {note.status === 'stopped' && canRetry && retry}
       {note.answer && (
         <>
           <button className="ghost" onClick={() => setShowAnswer((s) => !s)}>{showAnswer ? 'Hide answer' : 'Full answer'}</button>

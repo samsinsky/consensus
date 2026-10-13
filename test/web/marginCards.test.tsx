@@ -89,7 +89,7 @@ describe('NoteCard', () => {
 
   it('shows the latest note, the full answer on request, and quotes that failed', () => {
     const r = round({ notes: { a: { status: 'done', note: 'Tight draft.', answer: 'Full **answer**.', rejected: [{ quote: 'ship fast', reason: 'matched 2 places' }] } } });
-    act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={[r]} onRetry={() => {}} />));
+    act(() => root.render(<NoteCard participant={people[0]} all={people} roundRunning={false} latestRound={1} rounds={[r]} onRetry={() => {}} />));
     expand();
     expect(host.textContent).toContain('Tight draft.');
     expect(host.textContent).toContain('"ship fast" (matched 2 places)');
@@ -99,9 +99,9 @@ describe('NoteCard', () => {
 
   it('shows activity while running, and errors with Retry', () => {
     const onRetry = vi.fn();
-    act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={[round({ notes: { a: { status: 'running' } } })]} activity="Reading x.com" onRetry={onRetry} />));
+    act(() => root.render(<NoteCard participant={people[0]} all={people} roundRunning={false} latestRound={1} rounds={[round({ notes: { a: { status: 'running' } } })]} activity="Reading x.com" onRetry={onRetry} />));
     expect(host.textContent).toContain('Reading x.com…');
-    act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={[round({ notes: { a: { status: 'error', error: { code: 'parse', message: 'The answer was missing the JSON block.' }, answer: 'No JSON.' } } })]} onRetry={onRetry} />));
+    act(() => root.render(<NoteCard participant={people[0]} all={people} roundRunning={false} latestRound={1} rounds={[round({ notes: { a: { status: 'error', error: { code: 'parse', message: 'The answer was missing the JSON block.' }, answer: 'No JSON.' } } })]} onRetry={onRetry} />));
     expect(host.querySelector('.note-line')?.textContent).toContain('Error');
     expand();
     expect(host.textContent).toContain('The answer was missing the JSON block.');
@@ -113,7 +113,7 @@ describe('NoteCard', () => {
 describe('NoteCard collapsed line', () => {
   const round = (over: Partial<Round>): Round => ({ n: 1, sentAt: '2026-10-13T12:00:00Z', snapshot: '', participants: ['a'], notes: {}, ...over });
   const line = (r: Round, activity?: string) => {
-    act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={[r]} activity={activity} onRetry={() => {}} />));
+    act(() => root.render(<NoteCard participant={people[0]} all={people} roundRunning={false} latestRound={1} rounds={[r]} activity={activity} onRetry={() => {}} />));
     return host.querySelector('.note-line')!;
   };
 
@@ -135,6 +135,29 @@ describe('NoteCard collapsed line', () => {
     expect(line(round({ notes: { a: { status: 'running' } } })).textContent).toContain('Reviewing…');
     expect(line(round({ notes: { a: { status: 'running' } } }), 'Reading x.com').textContent).toContain('Reading x.com…');
     expect(line(round({ notes: { a: { status: 'stopped' } } })).textContent).toContain('Stopped');
+  });
+});
+
+describe('NoteCard Retry', () => {
+  const failed = (n: number): Round => ({ n, sentAt: '', snapshot: '', participants: ['a'], notes: { a: { status: 'error', error: { code: 'parse', message: 'Broke.' } } } });
+  const render = (rounds: Round[], roundRunning: boolean, latestRound: number) => {
+    act(() => root.render(<NoteCard participant={people[0]} all={people} rounds={rounds} roundRunning={roundRunning} latestRound={latestRound} onRetry={() => {}} />));
+    expand();
+  };
+
+  it('is offered only for the thread\'s latest round', () => {
+    render([failed(1)], false, 2);
+    expect(button('Retry')).toBeUndefined();
+    render([failed(2)], false, 2);
+    expect(button('Retry')).toBeTruthy();
+  });
+
+  it('is disabled with a reason while a review round is running', () => {
+    render([failed(1)], true, 1);
+    expect(button('Retry').disabled).toBe(true);
+    expect(button('Retry').title).toBe('Wait for the other reviews to finish');
+    render([failed(1)], false, 1);
+    expect(button('Retry').disabled).toBe(false);
   });
 });
 
