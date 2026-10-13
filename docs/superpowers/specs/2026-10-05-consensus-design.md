@@ -322,6 +322,8 @@ v1 keeps this addition cheap:
 
 ### Shared document with comment threads
 
+Designed 2026-10-13 as doc mode: see `2026-10-13-doc-mode-design.md`.
+
 A single document all participants work on, replacing chat history as the "current state". Participants leave comments anchored to passages, reply in threads, and propose edits as suggestions; a thread resolves when its concern is settled. This merges with automatic looped routing: the loop runs until threads resolve, then Sam reviews what remains.
 
 Risks to design for:
