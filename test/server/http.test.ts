@@ -195,3 +195,83 @@ describe('HTTP API', () => {
   });
 });
 
+
+describe('doc routes', () => {
+  const block = (o: unknown) => '```json\n' + JSON.stringify(o) + '\n```';
+
+  it('creates a doc, saves it, runs a round, and settles a proposal', async () => {
+    const created = await api('POST', '/api/threads', { kind: 'doc', brief: 'Bio', markdown: 'I have gone deep on LLMs.' });
+    expect(created.status).toBe(200);
+    const id = created.body.id as string;
+    expect(created.body.kind).toBe('doc');
+    const p = (await api('POST', `/api/threads/${id}/participants`, { provider: 'claude', model: 'claude-model' })).body;
+
+    expect((await api('PUT', `/api/threads/${id}/doc`, { revision: 0, markdown: 'I have gone deep on LLMs. Really.' })).status).toBe(204);
+    expect((await api('PUT', `/api/threads/${id}/doc`, { revision: 5, markdown: 'stale' })).status).toBe(409);
+
+    const started = await api('POST', `/api/threads/${id}/rounds`);
+    expect(started).toEqual({ status: 202, body: { round: 1 } });
+    expect((await api('POST', `/api/threads/${id}/rounds`)).status).toBe(409);
+    queues.at(-1)!.push({ type: 'done', text: block({ proposals: [{ quote: 'gone deep on', replacement: 'studied', reason: 'Plainer.' }], note: 'Good.' }) });
+    queues.at(-1)!.end();
+    let thread: Thread;
+    for (let i = 0; i < 50; i++) {
+      thread = (await api('GET', `/api/threads/${id}`)).body;
+      if (thread.doc!.rounds[0].notes[p.id].status !== 'running') break;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(thread!.doc!.proposals[0]).toMatchObject({ id: 'P1', quote: 'gone deep on' });
+
+    expect((await api('POST', `/api/threads/${id}/proposals/P1/replies`, { text: 'Hm.' })).status).toBe(204);
+    expect((await api('PATCH', `/api/threads/${id}/proposals/P1`, { status: 'accepted', replacement: 'studied hard' })).status).toBe(204);
+    expect((await api('PATCH', `/api/threads/${id}/proposals/P1`, { status: 'maybe' })).status).toBe(400);
+    expect((await api('POST', `/api/threads/${id}/restore`, { round: 1 })).status).toBe(204);
+    const after = (await api('GET', `/api/threads/${id}`)).body as Thread;
+    expect(after.doc!.proposals[0]).toMatchObject({ status: 'accepted', replacement: 'studied hard', replies: [{ from: 'user', text: 'Hm.' }] });
+    expect(after.doc!.revision).toBe(1);
+  });
+
+  it('toggles inclusion, removes participants, and stops a round', async () => {
+    const id = (await api('POST', '/api/threads', { kind: 'doc', markdown: 'Text.' })).body.id as string;
+    const a = (await api('POST', `/api/threads/${id}/participants`, { provider: 'claude', model: 'claude-model' })).body;
+    const b = (await api('POST', `/api/threads/${id}/participants`, { provider: 'codex', model: 'codex-model' })).body;
+    expect((await api('PATCH', `/api/threads/${id}/participants/${b.id}`, { included: false })).status).toBe(204);
+    expect((await api('DELETE', `/api/threads/${id}/participants/${b.id}`)).status).toBe(204);
+    expect((await api('POST', `/api/threads/${id}/rounds/stop`)).status).toBe(404);
+    await api('POST', `/api/threads/${id}/rounds`);
+    expect((await api('POST', `/api/threads/${id}/rounds/stop`)).status).toBe(204);
+    let thread: Thread;
+    for (let i = 0; i < 50; i++) {
+      thread = (await api('GET', `/api/threads/${id}`)).body;
+      if (thread.doc!.rounds[0].notes[a.id].status !== 'running') break;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(thread!.participants.map((x) => x.id)).toEqual([a.id]);
+    expect(thread!.doc!.rounds[0].notes[a.id].status).toBe('stopped');
+    // The note is saved as 'stopped' just before the round is released, so wait out that brief 409.
+    let retry = 409;
+    for (let i = 0; i < 50 && retry === 409; i++) {
+      retry = (await api('POST', `/api/threads/${id}/participants/${a.id}/retry-review`)).status;
+      if (retry === 409) await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(retry).toBe(202);
+  });
+
+  it('opens a chat reply as a doc and refuses chat sends to a doc', async () => {
+    const chat = (await api('POST', '/api/threads')).body.id as string;
+    const p = (await api('POST', `/api/threads/${chat}/participants`, { provider: 'claude', model: 'claude-model' })).body;
+    const sent = (await api('POST', `/api/threads/${chat}/messages`, { to: p.id, text: 'Draft a bio' })).body;
+    queues.at(-1)!.push({ type: 'done', text: 'A draft.' });
+    queues.at(-1)!.end();
+    for (let i = 0; i < 50; i++) {
+      const t = (await api('GET', `/api/threads/${chat}`)).body as Thread;
+      if (t.messages.some((m) => m.kind === 'reply' && m.status === 'done')) break;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    const doc = await api('POST', `/api/threads/${chat}/open-as-doc`, { replyId: sent.replyMessageId });
+    expect(doc.status).toBe(200);
+    expect(doc.body.doc).toMatchObject({ brief: 'Draft a bio', markdown: 'A draft.' });
+    const dp = doc.body.participants[0].id;
+    expect((await api('POST', `/api/threads/${doc.body.id}/messages`, { to: dp, text: 'Hi' })).status).toBe(400);
+  });
+});

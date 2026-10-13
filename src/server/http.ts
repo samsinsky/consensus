@@ -4,6 +4,7 @@ import { extname, join, normalize, sep } from 'node:path';
 import { PROVIDER_IDS, type ProviderId, type Settings, type ThreadEvent } from '../shared/types.js';
 import type { ProviderAdapter } from './adapters/types.js';
 import { ATTACHMENT_LIMITS, AttachmentError, type AttachmentStore } from './attachments.js';
+import { DocService } from './docs.js';
 import type { EventHub } from './hub.js';
 import type { Paths } from './paths.js';
 import { readPrompt, writePrompt } from './prompt.js';
@@ -18,6 +19,7 @@ type Deps = {
   paths: Paths;
   adapters: Record<ProviderId, ProviderAdapter>;
   attachments?: AttachmentStore;
+  docs?: DocService;
   webDir?: string;
 };
 
@@ -34,10 +36,17 @@ const TYPES: Record<string, string> = {
 export function createConsensusServer(deps: Deps): Server {
   const { router, store, hub, paths, adapters } = deps;
   const attachments = deps.attachments ?? router.attachments;
+  const docs = deps.docs ?? new DocService(router);
 
   const routes: [string, RegExp, Handler][] = [
     ['GET', /^\/api\/threads$/, async (_q, res) => json(res, 200, await store.list())],
-    ['POST', /^\/api\/threads$/, async (_q, res) => json(res, 200, await router.createThread())],
+    ['POST', /^\/api\/threads$/, async (req, res) => {
+      const body = await readJson(req);
+      if (body.kind === 'doc') {
+        return json(res, 200, await docs.create({ brief: optText(body.brief), markdown: optText(body.markdown) }));
+      }
+      json(res, 200, await router.createThread());
+    }],
     ['GET', re(`/api/threads/${ID}`), async (_q, res, [id]) => {
       const thread = await router.getThread(id);
       if (!thread) throw new RouterError('not_found', 'That thread does not exist.');
@@ -90,6 +99,10 @@ export function createConsensusServer(deps: Deps): Server {
     }],
     ['PATCH', re(`/api/threads/${ID}/participants/${ID}`), async (req, res, [id, pid]) => {
       const body = await readJson(req);
+      if (typeof body.included === 'boolean') {
+        await docs.setIncluded(id, pid, body.included);
+        return void res.writeHead(204).end();
+      }
       if (typeof body.model !== 'string' || !body.model) throw new RouterError('invalid', 'Pick a model.');
       await router.changeModel(id, pid, { model: body.model, effort: optString(body.effort) });
       res.writeHead(204).end();
@@ -113,6 +126,55 @@ export function createConsensusServer(deps: Deps): Server {
       const { userMessageId, replyMessageId, done } = await router.retry(id, rid);
       done.catch((e) => console.error('consensus: reply failed', e));
       json(res, 202, { userMessageId, replyMessageId });
+    }],
+    ['DELETE', re(`/api/threads/${ID}/participants/${ID}`), async (_q, res, [id, pid]) => {
+      await router.removeParticipant(id, pid);
+      res.writeHead(204).end();
+    }],
+    ['POST', re(`/api/threads/${ID}/open-as-doc`), async (req, res, [id]) => {
+      const body = await readJson(req);
+      if (typeof body.replyId !== 'string') throw new RouterError('invalid', 'Missing reply.');
+      json(res, 200, await docs.openAsDoc(id, body.replyId));
+    }],
+    ['PUT', re(`/api/threads/${ID}/doc`), async (req, res, [id]) => {
+      const body = await readJson(req);
+      if (typeof body.revision !== 'number') throw new RouterError('invalid', 'Missing revision.');
+      const ids = Array.isArray(body.briefAttachmentIds) ? body.briefAttachmentIds.filter((x: unknown) => typeof x === 'string') : undefined;
+      await docs.saveDoc(id, { revision: body.revision, markdown: optText(body.markdown), brief: optText(body.brief), briefAttachmentIds: ids });
+      res.writeHead(204).end();
+    }],
+    ['POST', re(`/api/threads/${ID}/rounds`), async (_q, res, [id]) => {
+      const { round, done } = await docs.startRound(id);
+      done.catch((e) => console.error('consensus: review round failed', e));
+      json(res, 202, { round });
+    }],
+    ['POST', re(`/api/threads/${ID}/rounds/stop`), async (_q, res, [id]) => {
+      if (!docs.stopRound(id)) throw new RouterError('not_found', 'No review round is running.');
+      res.writeHead(204).end();
+    }],
+    ['POST', re(`/api/threads/${ID}/participants/${ID}/retry-review`), async (_q, res, [id, pid]) => {
+      const { done } = await docs.retryReview(id, pid);
+      done.catch((e) => console.error('consensus: review retry failed', e));
+      res.writeHead(202).end();
+    }],
+    ['PATCH', re(`/api/threads/${ID}/proposals/${ID}`), async (req, res, [id, pid]) => {
+      const body = await readJson(req);
+      if (body.status !== undefined && !['accepted', 'rejected', 'dismissed'].includes(body.status)) throw new RouterError('invalid', 'Unknown status.');
+      const notChosen = Array.isArray(body.notChosen) ? body.notChosen.filter((x: unknown) => typeof x === 'string') : undefined;
+      await docs.updateProposal(id, pid, { status: body.status, replacement: optText(body.replacement), notChosen });
+      res.writeHead(204).end();
+    }],
+    ['POST', re(`/api/threads/${ID}/proposals/${ID}/replies`), async (req, res, [id, pid]) => {
+      const body = await readJson(req);
+      if (typeof body.text !== 'string') throw new RouterError('invalid', 'Missing text.');
+      await docs.reply(id, pid, body.text);
+      res.writeHead(204).end();
+    }],
+    ['POST', re(`/api/threads/${ID}/restore`), async (req, res, [id]) => {
+      const body = await readJson(req);
+      if (typeof body.round !== 'number') throw new RouterError('invalid', 'Missing round.');
+      await docs.restore(id, body.round);
+      res.writeHead(204).end();
     }],
     ['GET', /^\/api\/models$/, async (_q, res) => {
       const entries = await Promise.all(
@@ -184,6 +246,10 @@ function re(path: string): RegExp {
 
 function optString(v: unknown): string | undefined {
   return typeof v === 'string' && v ? v : undefined;
+}
+
+function optText(v: unknown): string | undefined {
+  return typeof v === 'string' ? v : undefined;
 }
 
 function json(res: ServerResponse, status: number, body: unknown): void {
