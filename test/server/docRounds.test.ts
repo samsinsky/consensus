@@ -1,7 +1,7 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DocService } from '../../src/server/docs.js';
 import { EventHub } from '../../src/server/hub.js';
 import { makePaths } from '../../src/server/paths.js';
@@ -192,6 +192,22 @@ describe('DocService rounds', () => {
     answer(claude, json({ note: 'Second try.' }));
     await retry.done;
     expect((await router.getThread(t.id))!.doc!.rounds[0].notes[a.id]).toMatchObject({ status: 'done', note: 'Second try.' });
+  });
+
+  it('frees the participant and the round when a retry fails to save', async () => {
+    const { t, a } = await docWithTwo();
+    await docs.setIncluded(t.id, (t.participants[1]).id, false);
+    const { done } = await docs.startRound(t.id);
+    claude.last().push({ type: 'error', error: { code: 'rate_limited', message: 'Slow down.' } });
+    claude.last().end();
+    await done;
+    vi.spyOn(router, 'save').mockRejectedValueOnce(new Error('disk full'));
+    await expect(docs.retryReview(t.id, a.id)).rejects.toThrow('disk full');
+    expect(router.roundRunning(t.id)).toBe(false);
+    expect(router.tryReserve(a.id)).toBe(true);
+    router.release(a.id);
+    const note = (await router.getThread(t.id))!.doc!.rounds[0].notes[a.id];
+    expect(note).toMatchObject({ status: 'error', error: { code: 'rate_limited' } });
   });
 
   it('deleting the thread stops the round and nothing writes it back', async () => {

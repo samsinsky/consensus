@@ -208,8 +208,15 @@ export class DocService {
     const controller = new AbortController();
     this.router.registerRound(threadId, controller);
     this.controllers.set(threadId, controller);
+    const previous = note;
     round.notes[p.id] = { status: 'running' };
-    await this.router.save(thread);
+    try {
+      await this.router.save(thread);
+    } catch (e) {
+      round.notes[p.id] = previous;
+      this.finish(threadId, [p]);
+      throw e;
+    }
     const done = this.review(thread, p, round, messages.get(p.id)!, controller.signal).then(() => this.finish(threadId, []));
     return { done };
   }
