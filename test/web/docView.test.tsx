@@ -170,11 +170,30 @@ describe('DocView', () => {
       typeBrief('edited');
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
       expect(host.textContent).toContain('Not saved');
+      expect(host.querySelector('.error-inline')?.textContent).toBe('busy');
       await act(async () => click(host.querySelector('.review-send')!));
       expect(api.saveDoc).toHaveBeenCalledTimes(2);
+      expect(host.querySelector('.error-inline')).toBeNull();
       expect(api.saveDoc).toHaveBeenLastCalledWith('t', { revision: 0, brief: 'edited' });
       expect(api.startRound).toHaveBeenCalledWith('t');
       expect(host.textContent).not.toContain('Not saved');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears the inline error when a later autosave succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(api.saveDoc).mockRejectedValueOnce(new Error('busy'));
+      await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
+      typeBrief('edited');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(host.querySelector('.error-inline')?.textContent).toBe('busy');
+      typeBrief('edited again');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(host.textContent).not.toContain('Not saved');
+      expect(host.querySelector('.error-inline')).toBeNull();
     } finally {
       vi.useRealTimers();
     }

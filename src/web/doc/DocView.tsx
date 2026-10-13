@@ -61,6 +61,7 @@ export function DocView({ thread, activity, models, defaults }: Props) {
       try {
         await api.saveDoc(thread.id, { revision: sentAt, ...body });
         setSaveState('saved');
+        setError(undefined);
         return true;
       } catch (e) {
         // Keep the edits only while they still apply; a restore replaced the text they were made against.
