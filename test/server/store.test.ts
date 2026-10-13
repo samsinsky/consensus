@@ -80,4 +80,18 @@ describe('ThreadStore', () => {
     await store.save(t);
     expect((await store.list()).find((s) => s.id === t.id)?.kind).toBe('doc');
   });
+
+  it('marks a doc round that was running when Consensus stopped as interrupted', async () => {
+    const { store } = await newStore();
+    const t = await store.create('Doc');
+    t.kind = 'doc';
+    t.doc = {
+      brief: '', markdown: '', savedAt: '', revision: 0, included: [], proposals: [], nextProposal: 1,
+      rounds: [{ n: 1, sentAt: '', snapshot: '', participants: ['a'], notes: { a: { status: 'running' } } }],
+    };
+    await store.save(t);
+    expect((await store.get(t.id))!.doc!.rounds[0].notes.a).toEqual({
+      status: 'error', error: { code: 'interrupted', message: 'Consensus stopped before this review finished.' },
+    });
+  });
 });

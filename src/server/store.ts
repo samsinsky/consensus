@@ -29,6 +29,13 @@ export class ThreadStore {
         m.error = { code: 'interrupted', message: 'Consensus stopped before this reply finished.' };
       }
     }
+    for (const round of thread.doc?.rounds ?? []) {
+      for (const [id, note] of Object.entries(round.notes)) {
+        if (note.status === 'running') {
+          round.notes[id] = { status: 'error', error: { code: 'interrupted', message: 'Consensus stopped before this review finished.' } };
+        }
+      }
+    }
     return thread;
   }
 

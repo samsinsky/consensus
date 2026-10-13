@@ -202,7 +202,10 @@ export class Router {
     for (const summary of await this.deps.store.list()) {
       const thread = await this.getThread(summary.id);
       if (!thread) continue;
-      const referenced = new Set(thread.messages.flatMap((m) => (m.kind === 'user' ? (m.attachments ?? []).map((a) => a.id) : [])));
+      const referenced = new Set([
+        ...thread.messages.flatMap((m) => (m.kind === 'user' ? (m.attachments ?? []).map((a) => a.id) : [])),
+        ...(thread.doc?.briefAttachments ?? []).map((a) => a.id),
+      ]);
       removed += await this.attachments.sweep(thread.id, referenced, maxAgeMs);
     }
     return removed;
@@ -220,6 +223,7 @@ export class Router {
       createdAt: new Date().toISOString(),
     };
     thread.participants.push(participant);
+    if (thread.doc) thread.doc.included.push(participant.id);
     await this.commit(thread);
     return participant;
   }
