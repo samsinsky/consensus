@@ -76,7 +76,7 @@ Forwarding replies between participants loops: each model restates its taste, se
 
 - Sam edits directly at any time, including during a round. Edits change the document; they are not proposals.
 - Autosave runs about a second after typing stops. Send saves first.
-- Formatting: paragraphs, headings, bold, italic, bulleted and numbered lists, and links, stored as Markdown. No toolbar: the usual shortcuts (Cmd+B, Cmd+I, Cmd+K) and Markdown typed at the start of a line ("## ", "- ", "1. ") apply formatting.
+- Formatting: paragraphs, headings, bold, italic, bulleted and numbered lists, and links, stored as Markdown. No toolbar: bold and italic use the usual shortcuts (Cmd+B, Cmd+I), links come from pasting a URL over selected text or typing `[text](url)`, and Markdown typed at the start of a line ("## ", "- ", "1. ") formats it.
 - **Copy:** an icon in the document's top corner copies the whole document to the clipboard as formatted text (HTML) with a plain-text fallback, so it pastes cleanly into Google Docs, LinkedIn, or Gmail. A brief "Copied" confirmation shows.
 - **History:** an icon beside Copy lists one snapshot per round ("Round 3 · 2:14 PM"), taken as the round was sent. Picking one shows it read-only with a Restore button. Restore replaces the document text; proposals re-anchor against it as after any edit.
 
