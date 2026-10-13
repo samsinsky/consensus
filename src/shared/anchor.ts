@@ -53,7 +53,8 @@ export function cleanQuote(s: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/^\s*(#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s*)/gm, '')
     .replace(/\*\*|__|`/g, '')
-    .replace(/(^|[^\w*])\*(?=\S)|(?<=\S)\*(?=[^\w*]|$)/g, '$1');
+    .replace(/(^|[^\w*\\])\*(?=\S)|(?<=[^\s\\])\*(?=[^\w*]|$)/g, '$1')
+    .replace(/\\([!-/:-@[-`{-~])/g, '$1');
 }
 
 export function findAll(index: TextIndex, quote: string): number[] {

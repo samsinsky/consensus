@@ -8,6 +8,12 @@ describe('normalize', () => {
 });
 
 describe('cleanQuote', () => {
+  it('strips backslash escapes before punctuation', () => {
+    expect(cleanQuote('snake\\_case \\[x\\] \\*now\\*')).toBe('snake_case [x] *now*');
+    expect(findAll(indexString('use snake_case [x] *now*'), 'snake\\_case \\[x\\]')).toHaveLength(1);
+    expect(cleanQuote('C:\\dir')).toBe('C:\\dir');
+  });
+
   it('drops Markdown marks a model copied from the document', () => {
     expect(cleanQuote('**gone deep on**')).toBe('gone deep on');
     expect(cleanQuote('*really* `fast`')).toBe('really fast');
