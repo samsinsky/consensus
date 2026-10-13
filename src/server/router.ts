@@ -45,12 +45,13 @@ export type ForwardContext = {
 
 export const HANDOFF_NOTE = "Drafts below may include the previous writer's commentary. Judge the text on its merits.";
 
-/** Sent with every forward, so the receiver both judges the work and moves the copy forward. */
+/** Sent with every forward: weigh the feedback, keep the draft unless something is wrong, and hand taste calls to Sam. */
 export const FORWARD_TASK =
   'What to do with this:\n' +
-  "1. Judge the other reviewer's work point by point. Say whether each point makes the copy better and why, in a sentence or two. Push back where it makes the copy worse.\n" +
-  "2. Write the full revised copy. Keep what you agree with, fix or drop what you don't, and follow my requests above.\n" +
-  '3. Close with two short lines: what you changed, and what you kept or rejected and why.\n\n' +
+  "1. Treat the other reviewer's draft as the current version. Change it only to fix a real problem: an error, something unclear, or something that misses my requests. If a change comes down to taste, keep the current wording.\n" +
+  "2. Respond briefly to the other reviewer's points. Skip points you both already agree on. You can agree with a point without changing anything.\n" +
+  '3. If the copy is ready, say so and give it unchanged. Otherwise, write the full revised copy.\n' +
+  '4. If you disagree with the other reviewer on a matter of taste, don\'t change it back. List it under "Your call" with each option on one line, and I\'ll decide.\n\n' +
   'If my note below asks for something different, follow the note.';
 
 export function attachmentBlock(att: Attachment, text: string): string {
@@ -91,9 +92,10 @@ function promptOf(thread: Thread, replyId: string): UserMessage | undefined {
 
 /**
  * Builds the handoff for the first quote's reply. The round is Sam's run of messages to that
- * participant, back to his last message to someone else.
+ * participant, back to his last message to someone else. The receiver never gets its own replies
+ * back: they are already in its conversation.
  */
-export function forwardContext(thread: Thread, quotes: Quote[]): ForwardContext {
+export function forwardContext(thread: Thread, quotes: Quote[], receiver?: string): ForwardContext {
   for (const q of quotes) {
     const replyIdx = thread.messages.findIndex((m) => m.id === q.messageId && m.kind === 'reply');
     const last = promptOf(thread, q.messageId);
@@ -104,18 +106,19 @@ export function forwardContext(thread: Thread, quotes: Quote[]): ForwardContext 
     for (let i = users.length - 1; i >= 0 && users[i].to === from; i--) round.unshift(users[i]);
     const first = round[0];
     const firstIdx = thread.messages.indexOf(first);
-    const root = rootPrompt(thread, first);
+    const root = thread.messages.find((m): m is UserMessage => m.kind === 'user' && !!m.text.trim());
+    const notOwn = (x: Quote) => !receiver || authorOf(thread, x.messageId) !== receiver;
 
     // Starting point: the participant's own previous version, else the draft forwarded in, else its first reply in the round.
     const previous = lastReplyFrom(thread.messages.slice(0, firstIdx), from);
-    const forwardedIn = first.quotes.map((x) => x.text).join('\n\n');
+    const forwardedIn = first.quotes.filter(notOwn).map((x) => x.text).join('\n\n');
     const firstReply = round.length > 1 ? lastReplyFrom(thread.messages.slice(firstIdx, thread.messages.indexOf(round[1])), from) : undefined;
     const start = previous ?? (forwardedIn || firstReply);
     const startFromQuotes = !previous && !!forwardedIn;
 
     const requests = round
       .filter((m) => m !== root)
-      .map((m) => ({ text: m.text.trim(), quotes: m === first && startFromQuotes ? [] : m.quotes.map((x) => x.text) }))
+      .map((m) => ({ text: m.text.trim(), quotes: m === first && startFromQuotes ? [] : m.quotes.filter(notOwn).map((x) => x.text) }))
       .filter((r) => r.text || r.quotes.length);
     return {
       resolved: true,
@@ -136,16 +139,9 @@ function lastReplyFrom(messages: Thread['messages'], participantId: string): str
   return undefined;
 }
 
-function rootPrompt(thread: Thread, prompt: UserMessage): UserMessage | undefined {
-  const seen = new Set<string>();
-  let current: UserMessage | undefined = prompt;
-  while (current && !seen.has(current.id)) {
-    seen.add(current.id);
-    const parent: UserMessage | undefined = current.quotes.length ? promptOf(thread, current.quotes[0].messageId) : undefined;
-    if (!parent) return current;
-    current = parent;
-  }
-  return undefined;
+function authorOf(thread: Thread, replyId: string): string | undefined {
+  const m = thread.messages.find((x) => x.id === replyId);
+  return m?.kind === 'reply' ? m.from : undefined;
 }
 
 export class Router {
@@ -253,7 +249,7 @@ export class Router {
         throw new RouterError('invalid', 'Write a message, forward a quote or attach a file.');
       }
       // Built before anything is recorded, so a missing file leaves the thread untouched.
-      ({ message: outgoing, images } = await this.buildOutgoing(thread, input.text, quotes, attachments));
+      ({ message: outgoing, images } = await this.buildOutgoing(thread, input.to, input.text, quotes, attachments));
       if (this.deleted.has(thread.id)) throw new RouterError('not_found', 'That thread was deleted.');
     } catch (e) {
       this.busy.delete(p.id);
@@ -381,8 +377,8 @@ export class Router {
     return out;
   }
 
-  private async buildOutgoing(thread: Thread, text: string, quotes: Quote[], attachments: Attachment[]): Promise<{ message: string; images: ImageInput[] }> {
-    const ctx = forwardContext(thread, quotes);
+  private async buildOutgoing(thread: Thread, to: string, text: string, quotes: Quote[], attachments: Attachment[]): Promise<{ message: string; images: ImageInput[] }> {
+    const ctx = forwardContext(thread, quotes, to);
     const original = quotes.length ? ctx.originalAttachments ?? [] : [];
     const render = async (list: Attachment[]) => {
       try {

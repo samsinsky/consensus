@@ -36,6 +36,7 @@ describe('prompt', () => {
   });
   it('mentions web reading and asks for the page behind each fact', () => {
     expect(DEFAULT_PROMPT).toContain('You can read web pages and search the web. When you state a fact from a page, say which page.');
+    expect(DEFAULT_PROMPT).toContain('When you revise copy, end with what you changed and why.');
   });
 
   it('upgrades an untouched older default and leaves edited prompts alone', async () => {

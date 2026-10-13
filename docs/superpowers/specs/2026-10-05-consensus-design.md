@@ -110,13 +110,13 @@ Adding a provider later means writing one adapter.
 ### Router
 
 - Sends each message only to the selected participant.
-- Builds the outgoing text for a forwarded reply as a handoff (revised 2026-10-09). The **round** is Sam's run of messages to the forwarded reply's participant, back to his last message to someone else. The handoff carries:
+- Builds the outgoing text for a forwarded reply as a handoff (revised 2026-10-09). The **round** is Sam's run of messages to the forwarded reply's participant, back to his last message to someone else. The receiver never gets its own replies back, since they are already in its conversation (revised 2026-10-13). The handoff carries:
   1. A note: "Drafts below may include the previous writer's commentary. Judge the text on its merits."
-  2. **Original request:** the first message of the forward chain, with its attachments.
-  3. **Starting point:** the participant's own previous reply if it had one before the round; else the draft forwarded in at the round's start; else its first reply in the round.
-  4. **Requests during the round:** Sam's messages in the round, word for word, with any critiques he forwarded into them (the original request is not repeated).
+  2. **Original request:** the first message in the thread that has text, with its attachments (revised 2026-10-13; tracing the forward chain stopped at mid-thread follow-ups such as "delivery time").
+  3. **Starting point:** the participant's own previous reply if it had one before the round; else the draft forwarded in at the round's start, unless the receiver wrote it; else its first reply in the round.
+  4. **Requests during the round:** Sam's messages in the round, word for word, with any critiques he forwarded into them, minus the receiver's own replies (the original request is not repeated).
   5. **The forwarded reply**, marked "Feedback from another reviewer". The model never learns which provider wrote it.
-  6. **What to do** (added 2026-10-09), so a forward always yields both a judgment and a revision whatever Sam types: judge the other reviewer's work point by point and push back where it makes the copy worse; write the full revised copy, following Sam's round requests; close with one line on what changed and one on what was kept or rejected and why. Sam's note takes priority if it asks for something else.
+  6. **What to do** (revised 2026-10-13, after models looped on matters of taste): treat the other reviewer's draft as the current version and change it only to fix a real problem (an error, something unclear, a missed request), keeping the current wording on taste; respond briefly and skip points both already agree on; say when the copy is ready and give it unchanged; list taste disagreements under "Your call" for Sam instead of changing them back. Sam's note takes priority if it asks for something else.
   7. Sam's new message, labeled "My note:" (omitted when empty).
 
   ```
@@ -139,9 +139,10 @@ Adding a provider later means writing one adapter.
   <quoted>…</quoted>
 
   What to do with this:
-  1. Judge the other reviewer's work point by point. …
-  2. Write the full revised copy. …
-  3. Close with two short lines: what you changed, and what you kept or rejected and why.
+  1. Treat the other reviewer's draft as the current version. Change it only to fix a real problem: …
+  2. Respond briefly to the other reviewer's points. Skip points you both already agree on. …
+  3. If the copy is ready, say so and give it unchanged. Otherwise, write the full revised copy.
+  4. If you disagree with the other reviewer on a matter of taste, don't change it back. List it under "Your call" …
 
   If my note below asks for something different, follow the note.
 
@@ -283,7 +284,7 @@ Added 2026-10-07. Participants can read web pages and search the web on every tu
 - Adapters report `activity` ("Searching the web for …", "Reading nodejs.org") and `source` (each page opened). Search queries are activity only; sources are pages actually opened.
 - The router streams activity to the page without saving it, and saves each reply's sources in order without repeats.
 - Codex narrates tool use in earlier messages ("I'll open the page…"); a reply's final text is its last message. Claude's `result` and Antigravity's `response` are already final.
-- The default system prompt adds: "You can read web pages and search the web. When you state a fact from a page, say which page." An untouched copy of an earlier default on disk is upgraded; an edited prompt is left alone.
+- The default system prompt adds: "You can read web pages and search the web. When you state a fact from a page, say which page." On 2026-10-13 it also gained "When you revise copy, end with what you changed and why.", so every reply carries its reasoning when forwarded. An untouched copy of an earlier default on disk is upgraded; an edited prompt is left alone.
 - **UI:** while a reply streams, a status line shows its current activity. Under a reply that opened pages, a collapsed **Sources** row shows up to three site favicons (loaded directly from each site, first letter when missing) and "+ N more" for further sites; clicking expands every page as a link.
 - **Risk accepted:** a page or forwarded reply can carry instructions to fetch an attacker's URL with conversation text in it, and Gemini turns can read local files through `view_file`. Sam runs the CLIs in auto mode, which allows more than this. The Sources list makes every fetch visible.
 

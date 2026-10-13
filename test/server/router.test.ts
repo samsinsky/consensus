@@ -77,12 +77,13 @@ describe('composeOutgoing', () => {
     );
   });
 
-  it('asks the receiver to judge and revise, and leaves out an empty note', () => {
+  it('asks the receiver to keep the draft unless something is wrong, and leaves out an empty note', () => {
     expect(FORWARD_TASK).toBe(
       'What to do with this:\n' +
-        "1. Judge the other reviewer's work point by point. Say whether each point makes the copy better and why, in a sentence or two. Push back where it makes the copy worse.\n" +
-        "2. Write the full revised copy. Keep what you agree with, fix or drop what you don't, and follow my requests above.\n" +
-        '3. Close with two short lines: what you changed, and what you kept or rejected and why.\n\n' +
+        "1. Treat the other reviewer's draft as the current version. Change it only to fix a real problem: an error, something unclear, or something that misses my requests. If a change comes down to taste, keep the current wording.\n" +
+        "2. Respond briefly to the other reviewer's points. Skip points you both already agree on. You can agree with a point without changing anything.\n" +
+        '3. If the copy is ready, say so and give it unchanged. Otherwise, write the full revised copy.\n' +
+        '4. If you disagree with the other reviewer on a matter of taste, don\'t change it back. List it under "Your call" with each option on one line, and I\'ll decide.\n\n' +
         'If my note below asks for something different, follow the note.',
     );
     expect(composeOutgoing('', [{ messageId: 'm', text: 'Draft' }])).toBe(`Feedback from another reviewer:\n<quoted>\nDraft\n</quoted>\n\n${FORWARD_TASK}`);
@@ -352,7 +353,9 @@ describe('Router forwarding context', () => {
     const sent = codex.requests.at(-1)!.message;
     // Claude's own earlier draft is the starting point; the critique forwarded back to it is a request.
     expect(sent).toContain('Starting point:\n<start>\nDraft v1\n</start>');
-    expect(sent).toContain('<requests>\n- Revise\n  <quoted>Too vague</quoted>\n- Shorter\n</requests>');
+    // The critique forwarded into the round was Codex's own reply, so Codex doesn't get it back.
+    expect(sent).toContain('<requests>\n- Revise\n- Shorter\n</requests>');
+    expect(sent).not.toContain('Too vague');
     expect(sent).toContain('<request>\nWrite a headline\n</request>');
     expect(sent).not.toContain('Draft v2');
   });
@@ -367,6 +370,39 @@ describe('Router forwarding context', () => {
     expect(sent).toContain('<start>\nToo vague\n</start>');
     expect(sent).toContain('<quoted>\nRun every kitchen from one recipe\n</quoted>');
     expect(sent).not.toContain('Kitchens that run themselves');
+  });
+
+  it('uses the first message in the thread as the original request, even after a plain follow-up', async () => {
+    const { t, a, b } = await threadWithTwo();
+    const s1 = await router.send(t.id, { to: a.id, text: 'Write a headline' });
+    await reply(claude, s1.done, 'Draft v1');
+    const s2 = await router.send(t.id, { to: b.id, text: '', quotes: [{ messageId: s1.replyMessageId, text: 'Draft v1' }] });
+    await reply(codex, s2.done, 'Draft v2');
+    const s3 = await router.send(t.id, { to: b.id, text: 'Use delivery time' });
+    await reply(codex, s3.done, 'Draft v3');
+    const s4 = await router.send(t.id, { to: a.id, text: '', quotes: [{ messageId: s3.replyMessageId, text: 'Draft v3' }] });
+    await reply(claude, s4.done, 'Draft v4');
+    const s5 = await router.send(t.id, { to: b.id, text: '', quotes: [{ messageId: s4.replyMessageId, text: 'Draft v4' }] });
+    await reply(codex, s5.done, 'Draft v5');
+    await router.send(t.id, { to: a.id, text: '', quotes: [{ messageId: s5.replyMessageId, text: 'Draft v5' }] });
+    const sent = claude.requests.at(-1)!.message;
+    expect(sent).toContain('Original request:\n<request>\nWrite a headline\n</request>');
+    expect(sent).not.toContain('<request>\nUse delivery time');
+  });
+
+  it("doesn't send a participant its own reply back as the starting point", async () => {
+    const { t, a, b } = await threadWithTwo();
+    const s1 = await router.send(t.id, { to: a.id, text: 'Write a headline' });
+    await reply(claude, s1.done, 'Draft v1');
+    const s2 = await router.send(t.id, { to: b.id, text: 'Critique', quotes: [{ messageId: s1.replyMessageId, text: 'Draft v1' }] });
+    await reply(codex, s2.done, 'Draft v2 with reasons');
+    const s3 = await router.send(t.id, { to: b.id, text: 'Shorter' });
+    await reply(codex, s3.done, 'Draft v3');
+    await router.send(t.id, { to: a.id, text: '', quotes: [{ messageId: s3.replyMessageId, text: 'Draft v3' }] });
+    const sent = claude.requests.at(-1)!.message;
+    expect(sent).not.toContain('Draft v1');
+    expect(sent).toContain('Starting point:\n<start>\nDraft v2 with reasons\n</start>');
+    expect(sent).toContain('<requests>\n- Critique\n- Shorter\n</requests>');
   });
 
   it('falls back to the bare quote when its source is unknown', async () => {
