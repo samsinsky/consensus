@@ -557,3 +557,63 @@ describe('Router web activity', () => {
     expect(JSON.stringify(saved)).not.toContain('Reading nodejs.org');
   });
 });
+
+describe('Router turns and doc support', () => {
+  it('runs a turn, reports activity, and advances the session only when it finishes', async () => {
+    const { t, a } = await threadWithTwo();
+    const thread = (await router.getThread(t.id))!;
+    const p = thread.participants.find((x) => x.id === a.id)!;
+    const seen: string[] = [];
+    const turn = router.runTurn(p, 'Review this', [], new AbortController().signal, { onActivity: (x) => seen.push(x) });
+    claude.last().push({ type: 'session', sessionId: 's1' });
+    claude.last().push({ type: 'activity', text: 'Reading x.com' });
+    claude.last().push({ type: 'done', text: 'All good' });
+    claude.last().end();
+    expect(await turn).toEqual({ status: 'done', text: 'All good', sources: [] });
+    expect(p.sessionId).toBe('s1');
+    expect(seen).toEqual(['Reading x.com']);
+  });
+
+  it('reports a stopped turn without advancing the session', async () => {
+    const { t, a } = await threadWithTwo();
+    const p = (await router.getThread(t.id))!.participants.find((x) => x.id === a.id)!;
+    const c = new AbortController();
+    const turn = router.runTurn(p, 'Review this', [], c.signal);
+    claude.last().push({ type: 'session', sessionId: 's2' });
+    c.abort();
+    expect((await turn).status).toBe('stopped');
+    expect(p.sessionId).toBeUndefined();
+  });
+
+  it('removes a participant, but not while it is replying', async () => {
+    const { t, a, b } = await threadWithTwo();
+    await router.send(t.id, { to: a.id, text: 'Hi' });
+    await expect(router.removeParticipant(t.id, a.id)).rejects.toMatchObject({ code: 'busy' });
+    await router.removeParticipant(t.id, b.id);
+    expect((await router.getThread(t.id))!.participants.map((p) => p.id)).toEqual([a.id]);
+    await expect(router.removeParticipant(t.id, 'nope')).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('refuses chat sends to a doc thread', async () => {
+    const { t, a } = await threadWithTwo();
+    (await router.getThread(t.id))!.kind = 'doc';
+    await expect(router.send(t.id, { to: a.id, text: 'Hi' })).rejects.toMatchObject({ code: 'invalid' });
+  });
+
+  it('reserves a participant once', async () => {
+    expect(router.tryReserve('p1')).toBe(true);
+    expect(router.tryReserve('p1')).toBe(false);
+    router.release('p1');
+    expect(router.tryReserve('p1')).toBe(true);
+  });
+
+  it('aborts a registered round when its thread is deleted', async () => {
+    const t = await router.createThread();
+    const c = new AbortController();
+    router.registerRound(t.id, c);
+    expect(router.roundRunning(t.id)).toBe(true);
+    await router.deleteThread(t.id);
+    expect(c.signal.aborted).toBe(true);
+    expect(router.roundRunning(t.id)).toBe(false);
+  });
+});

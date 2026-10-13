@@ -39,7 +39,7 @@ export class ThreadStore {
     for (const f of files) {
       try {
         const t = JSON.parse(await readFile(join(this.dir, f), 'utf8')) as Thread;
-        summaries.push({ id: t.id, title: t.title, updatedAt: t.updatedAt });
+        summaries.push({ id: t.id, title: t.title, updatedAt: t.updatedAt, kind: t.kind });
       } catch {
         console.warn(`consensus: skipping unreadable thread file ${f}`);
       }

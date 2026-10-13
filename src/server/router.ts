@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { modelLabel } from '../shared/labels.js';
-import type { Attachment, Origin, Participant, ProviderId, Quote, ReplyMessage, Thread, UserMessage } from '../shared/types.js';
+import type { AdapterError, Attachment, Origin, Participant, ProviderId, Quote, ReplyMessage, Thread, ThreadEvent, UserMessage } from '../shared/types.js';
 import type { ImageInput, ProviderAdapter } from './adapters/types.js';
 import { ATTACHMENT_LIMITS, AttachmentStore, truncationNote } from './attachments.js';
 import type { EventHub } from './hub.js';
@@ -18,6 +18,8 @@ export class RouterError extends Error {
 
 export type SendInput = { to: string; text: string; quotes?: Quote[]; attachmentIds?: string[]; origin?: Origin };
 export type SendResult = { userMessageId: string; replyMessageId: string; done: Promise<void> };
+export type TurnHooks = { onDelta?: (text: string) => void; onActivity?: (text: string) => void; onSource?: (url: string) => void };
+export type TurnResult = { status: 'done' | 'stopped' | 'error'; text: string; error?: AdapterError; sources: string[] };
 
 type Deps = {
   store: ThreadStore;
@@ -27,7 +29,7 @@ type Deps = {
   attachments?: AttachmentStore;
 };
 
-const UNTITLED = 'Untitled thread';
+export const UNTITLED = 'Untitled thread';
 
 /** What a forwarded reply needs: the task, where the round started, what was asked, and the reply itself. */
 export type ForwardContext = {
@@ -149,6 +151,7 @@ export class Router {
   private saves = new Map<string, Promise<void>>();
   private inflight = new Map<string, AbortController>();
   private busy = new Set<string>();
+  private rounds = new Map<string, AbortController>();
 
   private deleted = new Set<string>();
   readonly attachments: AttachmentStore;
@@ -183,6 +186,8 @@ export class Router {
   async deleteThread(threadId: string): Promise<void> {
     const thread = await this.mustThread(threadId);
     for (const m of thread.messages) if (m.kind === 'reply') this.inflight.get(m.id)?.abort();
+    this.rounds.get(threadId)?.abort();
+    this.rounds.delete(threadId);
     // A reply that finishes after this point must not write the thread back.
     this.deleted.add(threadId);
     this.threads.delete(threadId);
@@ -235,6 +240,7 @@ export class Router {
 
   async send(threadId: string, input: SendInput): Promise<SendResult> {
     const thread = await this.mustThread(threadId);
+    if (thread.kind === 'doc') throw new RouterError('invalid', 'This thread is a doc. Ask for a review round instead.');
     const p = this.mustParticipant(thread, input.to);
     const quotes = input.quotes ?? [];
     if (this.busy.has(p.id)) throw new RouterError('busy', 'That participant is still replying.');
@@ -304,57 +310,122 @@ export class Router {
     return this.send(threadId, { to: user.to, text: user.text, quotes: user.quotes, attachmentIds: user.attachments?.map((x) => x.id) });
   }
 
-  private async run(thread: Thread, p: Participant, reply: ReplyMessage, message: string, images: ImageInput[], controller: AbortController): Promise<void> {
+  async removeParticipant(threadId: string, participantId: string): Promise<void> {
+    const thread = await this.mustThread(threadId);
+    const p = this.mustParticipant(thread, participantId);
+    if (this.busy.has(p.id)) throw new RouterError('busy', 'That participant is still replying.');
+    thread.participants = thread.participants.filter((x) => x.id !== p.id);
+    if (thread.doc) thread.doc.included = thread.doc.included.filter((id) => id !== p.id);
+    await this.commit(thread);
+  }
+
+  save(thread: Thread): Promise<void> {
+    return this.commit(thread);
+  }
+
+  tryReserve(participantId: string): boolean {
+    if (this.busy.has(participantId)) return false;
+    this.busy.add(participantId);
+    return true;
+  }
+
+  release(participantId: string): void {
+    this.busy.delete(participantId);
+  }
+
+  isDeleted(threadId: string): boolean {
+    return this.deleted.has(threadId);
+  }
+
+  emit(threadId: string, ev: ThreadEvent): void {
+    this.deps.hub.emit(threadId, ev);
+  }
+
+  registerRound(threadId: string, c: AbortController): void {
+    this.rounds.set(threadId, c);
+  }
+
+  unregisterRound(threadId: string): void {
+    this.rounds.delete(threadId);
+  }
+
+  roundRunning(threadId: string): boolean {
+    return this.rounds.has(threadId);
+  }
+
+  /** Text attachments as blocks to inline, images as CLI image inputs. */
+  async renderAttachments(threadId: string, list: Attachment[]): Promise<{ blocks: string[]; images: ImageInput[] }> {
+    let blocks: string[];
+    try {
+      blocks = await Promise.all(list.filter((a) => a.kind === 'text').map(async (a) => attachmentBlock(a, await this.attachments.text(threadId, a))));
+    } catch {
+      throw new RouterError('invalid', 'An attached file is missing from disk. Attach it again.');
+    }
+    const images = list
+      .filter((a) => a.kind === 'image')
+      .map((a) => ({ id: a.id, name: a.name, mime: a.mime, path: this.attachments.filePath(threadId, a), threadId }));
+    return { blocks, images };
+  }
+
+  /** Runs one CLI turn. Memory advances only when the turn finishes. */
+  async runTurn(p: Participant, message: string, images: ImageInput[], signal: AbortSignal, hooks: TurnHooks = {}): Promise<TurnResult> {
     const adapter = this.deps.adapters[p.provider];
     let pendingSession: string | undefined;
-    let finished = false;
+    let text = '';
+    const sources: string[] = [];
+    let result: TurnResult | undefined;
     try {
       for await (const ev of adapter.send({
         sessionId: p.sessionId, message, model: p.model, effort: p.effort,
         promptHash: p.promptHash, promptPath: snapshotPath(this.deps.paths, p.promptHash),
         images: images.length ? images : undefined,
-        signal: controller.signal,
+        signal,
       })) {
         if (ev.type === 'session') {
           pendingSession = ev.sessionId;
         } else if (ev.type === 'delta') {
-          reply.text += ev.text;
-          this.deps.hub.emit(thread.id, { type: 'delta', messageId: reply.id, text: ev.text });
+          text += ev.text;
+          hooks.onDelta?.(ev.text);
         } else if (ev.type === 'activity') {
-          this.deps.hub.emit(thread.id, { type: 'activity', messageId: reply.id, text: ev.text });
+          hooks.onActivity?.(ev.text);
         } else if (ev.type === 'source') {
-          reply.sources ??= [];
-          if (!reply.sources.includes(ev.url)) {
-            reply.sources.push(ev.url);
-            this.deps.hub.emit(thread.id, { type: 'thread', thread });
+          if (!sources.includes(ev.url)) {
+            sources.push(ev.url);
+            hooks.onSource?.(ev.url);
           }
         } else if (ev.type === 'warning') {
           console.warn(`consensus: ${p.provider}: ${ev.message}`);
         } else if (ev.type === 'done') {
-          reply.text = ev.text;
-          reply.status = 'done';
           // Only a finished turn advances memory; stopped or failed forks are dropped.
           if (pendingSession) p.sessionId = pendingSession;
-          finished = true;
+          result = { status: 'done', text: ev.text, sources };
         } else if (ev.type === 'error') {
-          reply.status = 'error';
-          reply.error = ev.error;
-          finished = true;
+          result = { status: 'error', text, error: ev.error, sources };
         }
       }
     } catch (e) {
-      reply.status = 'error';
-      reply.error = { code: 'unknown', message: e instanceof Error ? e.message : String(e) };
-      finished = true;
+      result = { status: 'error', text, error: { code: 'unknown', message: e instanceof Error ? e.message : String(e) }, sources };
     }
-    if (!finished) {
-      if (controller.signal.aborted) {
-        reply.status = 'stopped';
-      } else {
-        reply.status = 'error';
-        reply.error = { code: 'unknown', message: 'The CLI ended without a reply.' };
-      }
-    }
+    if (result) return result;
+    if (signal.aborted) return { status: 'stopped', text, sources };
+    return { status: 'error', text, error: { code: 'unknown', message: 'The CLI ended without a reply.' }, sources };
+  }
+
+  private async run(thread: Thread, p: Participant, reply: ReplyMessage, message: string, images: ImageInput[], controller: AbortController): Promise<void> {
+    const result = await this.runTurn(p, message, images, controller.signal, {
+      onDelta: (text) => {
+        reply.text += text;
+        this.deps.hub.emit(thread.id, { type: 'delta', messageId: reply.id, text });
+      },
+      onActivity: (text) => this.deps.hub.emit(thread.id, { type: 'activity', messageId: reply.id, text }),
+      onSource: (url) => {
+        reply.sources = [...(reply.sources ?? []), url];
+        this.deps.hub.emit(thread.id, { type: 'thread', thread });
+      },
+    });
+    reply.status = result.status;
+    if (result.status === 'done') reply.text = result.text;
+    if (result.error) reply.error = result.error;
     this.busy.delete(p.id);
     this.inflight.delete(reply.id);
     try {
@@ -364,7 +435,7 @@ export class Router {
     }
   }
 
-  private async resolveAttachments(threadId: string, ids: string[]): Promise<Attachment[]> {
+  async resolveAttachments(threadId: string, ids: string[]): Promise<Attachment[]> {
     if (ids.length > ATTACHMENT_LIMITS.perMessage) {
       throw new RouterError('invalid', `Attach at most ${ATTACHMENT_LIMITS.perMessage} files per message.`);
     }
@@ -418,7 +489,7 @@ export class Router {
   }
 }
 
-function deriveTitle(text: string, quotes: Quote[]): string {
+export function deriveTitle(text: string, quotes: Quote[]): string {
   const source = text.trim() || quotes[0]?.text.trim() || UNTITLED;
   const line = source.split('\n')[0].trim();
   return line.length > 60 ? `${line.slice(0, 57)}...` : line;

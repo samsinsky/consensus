@@ -72,5 +72,12 @@ describe('ThreadStore', () => {
     expect(await store.get(t.id)).toBeUndefined();
     await expect(store.delete('../nope')).resolves.toBeUndefined();
   });
-});
 
+  it('lists each thread\'s kind', async () => {
+    const { store } = await newStore();
+    const t = await store.create('Doc');
+    t.kind = 'doc';
+    await store.save(t);
+    expect((await store.list()).find((s) => s.id === t.id)?.kind).toBe('doc');
+  });
+});
