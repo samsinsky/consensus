@@ -28,4 +28,21 @@ describe('ThreadsSidebar', () => {
     expect(clampSidebarWidth(300)).toBe(300);
     expect(clampSidebarWidth(900)).toBe(480);
   });
+
+  it('offers Chat or Doc for a new thread and marks doc threads', () => {
+    const onNew = vi.fn();
+    const host = document.createElement('div');
+    act(() => createRoot(host).render(
+      <ThreadsSidebar threads={[{ id: 't1', title: 'Hero', updatedAt: '' }, { id: 't2', title: 'Bio', updatedAt: '', kind: 'doc' }]}
+        collapsed={false} width={240} onResize={() => {}} onToggle={() => {}} onSelect={() => {}} onNew={onNew} onSettings={() => {}} onDelete={() => {}} />,
+    ));
+    const rows = host.querySelectorAll('.thread-row');
+    expect(rows[0].querySelector('.doc-icon')).toBeNull();
+    expect(rows[1].querySelector('.doc-icon')).not.toBeNull();
+    act(() => (host.querySelector('.new-thread') as HTMLButtonElement).click());
+    const choice = [...host.querySelectorAll('.new-choice button')] as HTMLButtonElement[];
+    expect(choice.map((b) => b.textContent)).toEqual(['Chat', 'Doc']);
+    act(() => choice[1].click());
+    expect(onNew).toHaveBeenCalledWith('doc');
+  });
 });

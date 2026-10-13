@@ -7,9 +7,9 @@ import { AttachmentChip } from './AttachmentChip.js';
 import { CollapsibleQuote } from './CollapsibleQuote.js';
 import { Sources } from './Sources.js';
 
-type Props = { thread: Thread; message: Message; activity?: string; onForward: (q: Quote) => void };
+type Props = { thread: Thread; message: Message; activity?: string; onForward: (q: Quote) => void; onOpenDoc?: (replyId: string) => void };
 
-export function MessageView({ thread, message, activity, onForward }: Props) {
+export function MessageView({ thread, message, activity, onForward, onOpenDoc }: Props) {
   const body = useRef<HTMLDivElement>(null);
   const [actionError, setActionError] = useState<string>();
   const [hasSelection, setHasSelection] = useState(false);
@@ -83,6 +83,7 @@ export function MessageView({ thread, message, activity, onForward }: Props) {
       )}
       <div className="msg-actions">
         {message.status === 'streaming' && <button onClick={() => act(() => api.stop(thread.id, message.id))}>Stop</button>}
+        {message.status === 'done' && onOpenDoc && <button className="ghost" onClick={() => onOpenDoc(message.id)}>Open as doc</button>}
         {hasSelection && (
           <button onMouseDown={(e) => e.preventDefault()} onClick={forwardSelection} title="Forward only the highlighted text">
             Forward selection

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ThreadSummary } from '../../shared/types.js';
+import type { ThreadKind, ThreadSummary } from '../../shared/types.js';
 import { clampSidebarWidth } from '../layout.js';
 
 type Props = {
@@ -10,13 +10,14 @@ type Props = {
   onResize: (width: number) => void;
   onToggle: () => void;
   onSelect: (id: string) => void;
-  onNew: () => void;
+  onNew: (kind: ThreadKind) => void;
   onSettings: () => void;
   onDelete: (id: string) => void;
 };
 
 export function ThreadsSidebar({ threads, activeId, collapsed, width, onResize, onToggle, onSelect, onNew, onSettings, onDelete }: Props) {
   const [confirming, setConfirming] = useState<string>();
+  const [choosing, setChoosing] = useState(false);
 
   if (collapsed) {
     return (
@@ -49,7 +50,13 @@ export function ThreadsSidebar({ threads, activeId, collapsed, width, onResize, 
           <button className="ghost" onClick={onToggle} title="Hide threads">«</button>
         </span>
       </div>
-      <button className="new-thread" onClick={onNew}>+ New thread</button>
+      <button className="new-thread" onClick={() => setChoosing((c) => !c)}>+ New thread</button>
+      {choosing && (
+        <div className="new-choice">
+          <button onClick={() => { setChoosing(false); onNew('chat'); }}>Chat</button>
+          <button onClick={() => { setChoosing(false); onNew('doc'); }}>Doc</button>
+        </div>
+      )}
       <ul>
         {threads.map((t) =>
           confirming === t.id ? (
@@ -61,6 +68,11 @@ export function ThreadsSidebar({ threads, activeId, collapsed, width, onResize, 
           ) : (
             <li key={t.id} className="thread-row">
               <button className={t.id === activeId ? 'thread active' : 'thread'} onClick={() => onSelect(t.id)}>
+                {t.kind === 'doc' && (
+                  <svg className="doc-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Doc">
+                    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h6" />
+                  </svg>
+                )}
                 {t.title}
               </button>
               <button className="ghost thread-delete" onClick={() => setConfirming(t.id)} title="Delete thread">×</button>

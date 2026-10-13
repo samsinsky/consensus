@@ -1,3 +1,4 @@
+import { api } from '../api.js';
 import { useEffect, useState, type ReactNode } from 'react';
 import { participantLabel } from '../../shared/labels.js';
 import type { ModelOption, ProviderDefaults, ProviderId, Quote, Thread } from '../../shared/types.js';
@@ -11,14 +12,25 @@ type Props = {
   activity: Record<string, string>;
   models: Record<ProviderId, ModelOption[]>;
   defaults: Record<ProviderId, ProviderDefaults>;
+  onOpenThread: (id: string) => void;
 };
 
-export function ThreadView({ thread, activity, models, defaults }: Props) {
+export function ThreadView({ thread, activity, models, defaults, onOpenThread }: Props) {
   const [view, setView] = useState<'timeline' | 'panes'>('timeline');
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [active, setActive] = useState<string | undefined>(() => nextActive(thread));
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   useEffect(() => setActive((a) => nextActive(thread, a)), [thread]);
+
+  const [openError, setOpenError] = useState<string>();
+  const openDoc = async (replyId: string) => {
+    try {
+      const doc = await api.openAsDoc(thread.id, replyId);
+      onOpenThread(doc.id);
+    } catch (e) {
+      setOpenError((e as Error).message);
+    }
+  };
 
   const forward = (q: Quote) => setQuotes((qs) => [...qs, q]);
   const toggle = (id: string) =>
@@ -48,6 +60,7 @@ export function ThreadView({ thread, activity, models, defaults }: Props) {
           <button className={view === 'panes' ? 'on' : ''} onClick={() => setView('panes')} disabled={!thread.participants.length}>Panes</button>
         </div>
       </header>
+      {openError && <p className="error-inline">{openError}</p>}
       {view === 'panes' && (
         <div className="pane-picker">
           {thread.participants.map((p) => (
@@ -60,14 +73,14 @@ export function ThreadView({ thread, activity, models, defaults }: Props) {
       )}
       {view === 'timeline' ? (
         <>
-          {composer(active, false, <MessageList thread={thread} messages={thread.messages} activity={activity} onForward={forward} />)}
+          {composer(active, false, <MessageList thread={thread} messages={thread.messages} activity={activity} onForward={forward} onOpenDoc={openDoc} />)}
         </>
       ) : (
         <div className="panes">
           {shown.map((p) => (
             <section key={p.id} className="pane">
               <h2><span className={`dot ${p.provider}`} /> {participantLabel(p, thread.participants)}</h2>
-              {composer(p.id, true, <MessageList thread={thread} messages={paneMessages(thread, p.id)} activity={activity} onForward={forward} />)}
+              {composer(p.id, true, <MessageList thread={thread} messages={paneMessages(thread, p.id)} activity={activity} onForward={forward} onOpenDoc={openDoc} />)}
             </section>
           ))}
           {!shown.length && <p className="empty">Tick a participant to show its pane.</p>}

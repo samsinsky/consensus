@@ -2,12 +2,12 @@ import { useLayoutEffect, useRef } from 'react';
 import type { Message, Quote, Thread } from '../../shared/types.js';
 import { MessageView } from './MessageView.js';
 
-type Props = { thread: Thread; messages: Message[]; activity: Record<string, string>; onForward: (q: Quote) => void };
+type Props = { thread: Thread; messages: Message[]; activity: Record<string, string>; onForward: (q: Quote) => void; onOpenDoc?: (replyId: string) => void };
 
 /** How close to the bottom still counts as "at the bottom". */
 const PIN_SLACK = 24;
 
-export function MessageList({ thread, messages, activity, onForward }: Props) {
+export function MessageList({ thread, messages, activity, onForward, onOpenDoc }: Props) {
   const box = useRef<HTMLDivElement>(null);
   // Follow new text only while the reader sits at the bottom; scrolling up lets them read in peace.
   const pinned = useRef(true);
@@ -32,7 +32,7 @@ export function MessageList({ thread, messages, activity, onForward }: Props) {
   return (
     <div className="messages" ref={box} onScroll={onScroll}>
       {messages.map((m) => (
-        <MessageView key={m.id} thread={thread} message={m} activity={activity[m.id]} onForward={onForward} />
+        <MessageView key={m.id} thread={thread} message={m} activity={activity[m.id]} onForward={onForward} onOpenDoc={onOpenDoc} />
       ))}
     </div>
   );

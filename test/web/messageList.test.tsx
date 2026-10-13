@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Thread } from '../../src/shared/types.js';
 import { MessageList } from '../../src/web/components/MessageList.js';
 
@@ -78,5 +78,17 @@ describe('MessageList', () => {
       render([...thread.messages, reply('a'), { id: 'u2', kind: 'user', to: 'a', text: 'Next', quotes: [], sentAt: '' }]);
       expect(box.scrollTop).toBe(900);
     });
+  });
+
+  it('offers Open as doc on a finished reply', () => {
+    const onOpenDoc = vi.fn();
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const done = { id: 'r1', kind: 'reply' as const, from: 'a', text: 'Draft.', model: 'haiku', status: 'done' as const, sentAt: '' };
+    act(() => root.render(<MessageList thread={thread} messages={[...thread.messages, done]} activity={{}} onForward={() => {}} onOpenDoc={onOpenDoc} />));
+    const open = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Open as doc')!;
+    act(() => open.click());
+    expect(onOpenDoc).toHaveBeenCalledWith('r1');
+    act(() => root.unmount());
   });
 });

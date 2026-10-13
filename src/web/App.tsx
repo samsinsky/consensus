@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ModelOption, ProviderId, Settings, ThreadSummary } from '../shared/types.js';
+import type { ModelOption, ProviderId, Settings, ThreadKind, ThreadSummary } from '../shared/types.js';
 import { api } from './api.js';
 import { guardFileDrops } from './dropGuard.js';
 import { clampSidebarWidth, SIDEBAR } from './layout.js';
+import { DocView } from './doc/DocView.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
 import { ThreadsSidebar } from './components/ThreadsSidebar.js';
 import { ThreadView } from './components/ThreadView.js';
@@ -67,10 +68,14 @@ export function App() {
     if (thread) refresh();
   }, [thread?.title, thread?.updatedAt, refresh]);
 
-  const newThread = async () => {
-    const t = await api.createThread();
+  const newThread = async (kind: ThreadKind = 'chat') => {
+    const t = await api.createThread(kind);
     await refresh();
     setActiveId(t.id);
+  };
+  const openThread = async (id: string) => {
+    await refresh();
+    setActiveId(id);
   };
 
   return (
@@ -89,11 +94,15 @@ export function App() {
       />
       <main className="main">
         {thread && models && settings ? (
-          <ThreadView key={thread.id} thread={thread} activity={activity} models={models} defaults={settings.defaults} />
+          thread.kind === 'doc' ? (
+            <DocView key={thread.id} thread={thread} activity={activity} models={models} defaults={settings.defaults} />
+          ) : (
+            <ThreadView key={thread.id} thread={thread} activity={activity} models={models} defaults={settings.defaults} onOpenThread={openThread} />
+          )
         ) : (
           <div className="empty">
             <p>Pick a thread or start a new one.</p>
-            <button onClick={newThread}>New thread</button>
+            <button onClick={() => newThread()}>New thread</button>
           </div>
         )}
       </main>
