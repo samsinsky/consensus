@@ -120,9 +120,10 @@ button.danger { background: var(--error); border-color: var(--error); color: whi
 .input-wrap { position: relative; flex: 1; display: flex; }
 .input-wrap .attach { position: absolute; left: 6px; bottom: 7px; padding: 4px; z-index: 1; display: flex; color: var(--muted); }
 .input-wrap .attach:hover { color: var(--text); }
-.send-btn { position: absolute; right: 6px; bottom: 6px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--accent); border-color: var(--accent); color: white; display: flex; align-items: center; justify-content: center; }
-.send-btn:disabled { background: var(--line); border-color: var(--line); color: var(--muted); opacity: 1; }
-.send-btn.stop { background: var(--text); border-color: var(--text); color: var(--bg); }
+.send-btn { position: absolute; right: 6px; bottom: 6px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: transparent; border-color: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+.send-btn:hover:not(:disabled) { color: var(--text); }
+.send-btn:disabled { background: transparent; border-color: transparent; color: var(--muted); opacity: 0.4; }
+.send-btn.stop { background: transparent; border-color: transparent; color: var(--muted); }
 .field-col { display: flex; flex-direction: column; gap: 3px; }
 .field-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .sidebar { position: relative; overflow-x: hidden; }
