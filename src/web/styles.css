@@ -216,3 +216,4 @@ body.resizing { cursor: col-resize; user-select: none; }
 .note .note-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .card.stale.stale-line .tag { flex: none; }
 .note .author, .card.stale .author { cursor: pointer; }
+.review-summary .note-model { margin-left: 2px; font-size: 12px; }

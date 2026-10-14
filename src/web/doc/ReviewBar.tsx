@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { participantLabel } from '../../shared/labels.js';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { modelLabel, participantLabel, participantName } from '../../shared/labels.js';
 import type { ModelOption, ProviderDefaults, ProviderId, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
 import { ModelPicker } from '../components/ModelPicker.js';
@@ -14,11 +14,21 @@ type Props = {
   onStop: () => void;
 };
 
-export function summaryText(thread: Thread): string {
+/** Up to three included reviewers, each with its model as a subtitle, then "+ N more". */
+function Summary({ thread }: { thread: Thread }) {
   const included = thread.participants.filter((p) => thread.doc?.included.includes(p.id));
-  if (!included.length) return 'Nobody included';
-  const shown = included.slice(0, 3).map((p) => `✓ ${participantLabel(p, thread.participants)}`).join(' • ');
-  return included.length > 3 ? `${shown} + ${included.length - 3} more` : shown;
+  if (!included.length) return <>Nobody included</>;
+  return (
+    <>
+      {included.slice(0, 3).map((p, i) => (
+        <Fragment key={p.id}>
+          {i > 0 && ' • '}
+          {participantName(p, thread.participants)} <span className="note-model">{modelLabel(p.model, p.effort)}</span>
+        </Fragment>
+      ))}
+      {included.length > 3 && ` + ${included.length - 3} more`}
+    </>
+  );
 }
 
 export function ReviewBar({ thread, models, defaults, activity, running, onSend, onStop }: Props) {
@@ -57,7 +67,7 @@ export function ReviewBar({ thread, models, defaults, activity, running, onSend,
     <div className="review-bar" ref={wrap}>
       <span className="review-label">Ask for review:</span>
       <button className="review-summary" onClick={() => (open ? close() : setOpen(true))}>
-        {summaryText(thread)} ▾
+        <Summary thread={thread} /> ▾
       </button>
       {running && (
         <span className="review-activity">

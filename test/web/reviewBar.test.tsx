@@ -8,7 +8,7 @@ vi.mock('../../src/web/api.js', () => ({
   api: { setIncluded: vi.fn().mockResolvedValue(undefined), removeParticipant: vi.fn().mockResolvedValue(undefined), addParticipant: vi.fn().mockResolvedValue({}) },
 }));
 const { api } = await import('../../src/web/api.js');
-const { ReviewBar, summaryText } = await import('../../src/web/doc/ReviewBar.js');
+const { ReviewBar } = await import('../../src/web/doc/ReviewBar.js');
 
 const person = (id: string, provider: Participant['provider'], model: string, ordinal = 1): Participant => ({ id, provider, model, effort: 'high', promptHash: 'h', ordinal, createdAt: '' });
 const thread = (included: string[], running = false): Thread => ({
@@ -39,11 +39,16 @@ const click = (el: Element) => act(() => el.dispatchEvent(new MouseEvent('click'
 const render = (t: Thread, props: Partial<{ onSend: () => void; onStop: () => void; activity: Record<string, string> }> = {}) =>
   act(() => root.render(<ReviewBar thread={t} models={models} defaults={defaults} activity={props.activity ?? {}} running={t.doc!.rounds.some((r) => Object.values(r.notes).some((n) => n.status === 'running'))} onSend={props.onSend ?? (() => {})} onStop={props.onStop ?? (() => {})} />));
 
-describe('summaryText', () => {
-  it('lists up to three included participants, then + N more', () => {
-    expect(summaryText(thread(['a', 'b']))).toBe('✓ Claude #1 · opus high • ✓ ChatGPT #1 · terra high');
-    expect(summaryText(thread(['a', 'b', 'c', 'd', 'e']))).toBe('✓ Claude #1 · opus high • ✓ ChatGPT #1 · terra high • ✓ Claude #2 · sonnet high + 2 more');
-    expect(summaryText(thread([]))).toBe('Nobody included');
+describe('review summary', () => {
+  const summary = () => host.querySelector('.review-summary')!;
+  it('lists up to three included participants, each with its model as a subtitle, then + N more', () => {
+    render(thread(['a', 'b']));
+    expect(summary().textContent).toBe('Claude #1 opus high • ChatGPT #1 terra high ▾');
+    expect([...summary().querySelectorAll('.note-model')].map((m) => m.textContent)).toEqual(['opus high', 'terra high']);
+    render(thread(['a', 'b', 'c', 'd', 'e']));
+    expect(summary().textContent).toBe('Claude #1 opus high • ChatGPT #1 terra high • Claude #2 sonnet high + 2 more ▾');
+    render(thread([]));
+    expect(summary().textContent).toBe('Nobody included ▾');
   });
 });
 
