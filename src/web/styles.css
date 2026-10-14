@@ -175,6 +175,9 @@ body.resizing { cursor: col-resize; user-select: none; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .card .reason { margin: 0; color: var(--text); }
 .card .counts { color: var(--muted); margin-left: 6px; white-space: nowrap; }
+.vote { position: relative; cursor: default; }
+.vote:hover { color: var(--text); }
+.vote-tip { position: fixed; max-width: 280px; z-index: 5; white-space: pre-line; font-style: normal; font-weight: normal; font-size: 12px; line-height: 1.5; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.2); }
 .card .option { display: flex; gap: 6px; align-items: flex-start; }
 .card .option-text { display: block; font-style: italic; }
 .card .replacement { width: 100%; resize: none; font-size: 13px; line-height: 1.45; max-height: 50vh; overflow-y: auto; }

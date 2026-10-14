@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { participantLabel } from '../../shared/labels.js';
-import { stanceCounts } from '../../shared/proposals.js';
+import { stanceVoters } from '../../shared/proposals.js';
 import type { Participant, Proposal, ProposalReply } from '../../shared/types.js';
 import { useAutoGrow } from '../useAutoGrow.js';
 import type { Group } from './anchoring.js';
@@ -55,7 +55,7 @@ export function ProposalCard({ group, shown, participants, focused, onFocus, onP
           <label key={p.id} className="option">
             <input type="radio" name={`opt-${group.key}`} checked={p.id === current.id} onChange={() => onPickOption(p.id)} />
             <span>
-              {LETTERS[i]} · <Author p={p} all={participants} /> <Counts p={p} />
+              {LETTERS[i]} · <Author p={p} all={participants} /> <Counts p={p} all={participants} />
               <span className="option-text">"{p.replacement}"</span>
               <span className="reason">{p.reason}</span>
             </span>
@@ -63,7 +63,7 @@ export function ProposalCard({ group, shown, participants, focused, onFocus, onP
         ))
       ) : (
         <>
-          <p className="reason">{current.reason} <Counts p={current} /></p>
+          <p className="reason">{current.reason} <Counts p={current} all={participants} /></p>
         </>
       )}
       <textarea
@@ -107,9 +107,31 @@ function Author({ p, all }: { p: Proposal; all: Participant[] }) {
   return <span className="author"><span className={`dot ${providerOf(p.authors, all)}`} /> {authorLabel(p.authors, all)}</span>;
 }
 
-function Counts({ p }: { p: Proposal }) {
-  const { agree, disagree } = stanceCounts(p);
-  return <span className="counts">✓{agree} ✗{disagree}</span>;
+function Counts({ p, all }: { p: Proposal; all: Participant[] }) {
+  const { agree, disagree } = stanceVoters(p);
+  const name = (id: string) => `${authorLabel([id], all)}${p.authors.includes(id) ? ' (proposed)' : ''}`;
+  const tip = (title: string, ids: string[]) => [title, ...(ids.length ? ids.map(name) : ['No one'])].join('\n');
+  return (
+    <span className="counts">
+      <Vote tip={tip('Agree', agree)}>✓{agree.length}</Vote>{' '}
+      <Vote tip={tip('Disagree', disagree)}>✗{disagree.length}</Vote>
+    </span>
+  );
+}
+
+/** A count that lists its voters on hover, in a popup fixed to the window so the margin's scroll box can't clip it. */
+function Vote({ tip, children }: { tip: string; children: ReactNode }) {
+  const [at, setAt] = useState<{ top: number; left: number }>();
+  const show = (e: MouseEvent<HTMLSpanElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setAt({ top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - 288)) });
+  };
+  return (
+    <span className="vote" data-tip={tip} onMouseEnter={show} onMouseLeave={() => setAt(undefined)}>
+      {children}
+      {at && <span className="vote-tip" style={at}>{tip}</span>}
+    </span>
+  );
 }
 
 function Replies({ replies, participants }: { replies: ProposalReply[]; participants: Participant[] }) {

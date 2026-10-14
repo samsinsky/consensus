@@ -26,15 +26,21 @@ export function stances(p: Proposal): Map<string, Stance> {
   return out;
 }
 
-export function stanceCounts(p: Proposal): { agree: number; disagree: number } {
-  let agree = p.authors.length;
-  let disagree = 0;
+/** Who agrees and who disagrees: authors always agree, others by their latest stance. */
+export function stanceVoters(p: Proposal): { agree: string[]; disagree: string[] } {
+  const agree = [...p.authors];
+  const disagree: string[] = [];
   for (const [from, s] of stances(p)) {
     if (p.authors.includes(from)) continue;
-    if (s === 'agree') agree++;
-    if (s === 'disagree') disagree++;
+    if (s === 'agree') agree.push(from);
+    if (s === 'disagree') disagree.push(from);
   }
   return { agree, disagree };
+}
+
+export function stanceCounts(p: Proposal): { agree: number; disagree: number } {
+  const { agree, disagree } = stanceVoters(p);
+  return { agree: agree.length, disagree: disagree.length };
 }
 
 export function isYourCall(group: Proposal[]): boolean {

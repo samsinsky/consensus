@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupOverlaps, isYourCall, stanceCounts } from '../../src/shared/proposals.js';
+import { groupOverlaps, isYourCall, stanceCounts, stanceVoters } from '../../src/shared/proposals.js';
 import type { Proposal } from '../../src/shared/types.js';
 
 const prop = (over: Partial<Proposal>): Proposal => ({
@@ -31,6 +31,22 @@ describe('stanceCounts', () => {
       ],
     });
     expect(stanceCounts(p)).toEqual({ agree: 2, disagree: 1 });
+  });
+});
+
+describe('stanceVoters', () => {
+  it('lists authors first among the agrees, then each participant by latest stance', () => {
+    const p = prop({
+      authors: ['a'],
+      replies: [
+        { from: 'b', stance: 'agree', text: '', at: '' },
+        { from: 'c', stance: 'agree', text: '', at: '' },
+        { from: 'c', stance: 'disagree', text: '', at: '' },
+        { from: 'a', stance: 'disagree', text: '', at: '' },
+        { from: 'd', stance: 'your_call', text: '', at: '' },
+      ],
+    });
+    expect(stanceVoters(p)).toEqual({ agree: ['a', 'b'], disagree: ['c'] });
   });
 });
 

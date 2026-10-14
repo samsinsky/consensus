@@ -42,6 +42,9 @@ describe('ProposalCard', () => {
     expect(host.textContent).toContain('Fits "Through".');
     expect(host.textContent).toContain('✓1');
     expect(host.textContent).toContain('✗1');
+    const [yes, no] = [...host.querySelectorAll('.counts .vote')] as HTMLElement[];
+    expect(yes.dataset.tip).toBe('Agree\nClaude · opus high (proposed)');
+    expect(no.dataset.tip).toBe('Disagree\nChatGPT · terra high');
     expect(host.textContent).toContain('ChatGPT · terra high (disagree): Weaker verb.');
     expect(host.textContent).toContain('You: Hm.');
     expect(host.textContent).not.toContain('Your call');
