@@ -120,11 +120,12 @@ describe('NoteCard collapsed line', () => {
     return host.querySelector('.note-line')!;
   };
 
-  it('is collapsed by default: name, the start of the note, and the model beneath, expanding on click', () => {
+  it('is collapsed by default: name and model, then the start of the note beneath, expanding on click', () => {
     const long = 'x'.repeat(100);
     const el = line(round({ notes: { a: { status: 'done', note: long } } }));
-    expect(el.querySelector('.author')!.textContent).toBe(' Claude');
-    expect(el.querySelector('.note-model')!.textContent).toBe('opus high');
+    expect(el.querySelector('.author .note-model')!.textContent).toBe('opus high');
+    expect(el.querySelector('.author')!.textContent).toBe(' Claudeopus high');
+    expect(el.querySelector('.author + .note-summary')).not.toBeNull();
     expect(el.textContent).toContain('x'.repeat(80) + '…');
     expect(el.textContent).not.toContain('x'.repeat(81));
     expect(host.querySelector('.card-head')).toBeNull();

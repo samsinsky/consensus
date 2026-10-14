@@ -29,9 +29,11 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
   if (!open) {
     return (
       <button className="card note note-line" onClick={() => setOpen(true)}>
-        <span className="author"><span className={`dot ${participant.provider}`} /> {participantName(participant, all)}</span>
+        <span className="author">
+          <span className={`dot ${participant.provider}`} /> {participantName(participant, all)}
+          <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
+        </span>
         <span className="note-summary">{summary(note, activity)}</span>
-        <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
       </button>
     );
   }
