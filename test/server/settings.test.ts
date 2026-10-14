@@ -6,9 +6,9 @@ import { makePaths } from '../../src/server/paths.js';
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../../src/server/settings.js';
 
 describe('settings', () => {
-  it('defaults ChatGPT to Terra and Gemini to 3.1 Pro, both at high effort', () => {
+  it('defaults ChatGPT to Terra and Gemini to 3.8 Flash, both at high effort', () => {
     expect(DEFAULT_SETTINGS.defaults.codex).toEqual({ model: 'gpt-5.6-terra', effort: 'high' });
-    expect(DEFAULT_SETTINGS.defaults.gemini).toEqual({ model: 'gemini-3.1-pro', effort: 'high' });
+    expect(DEFAULT_SETTINGS.defaults.gemini).toEqual({ model: 'gemini-3.8-flash', effort: 'high' });
   });
 
   it('returns defaults when no file exists', async () => {

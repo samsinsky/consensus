@@ -28,7 +28,8 @@ async function listModels(codexHome: string): Promise<ModelOption[]> {
     const cache = JSON.parse(await readFile(join(codexHome, 'models_cache.json'), 'utf8'));
     const models: any[] = Array.isArray(cache) ? cache : cache.models ?? [];
     const options = models
-      .filter((m) => typeof m.slug === 'string' && !m.slug.includes('auto-review'))
+      // Codex hides retired and internal models from its own picker.
+      .filter((m) => typeof m.slug === 'string' && !m.slug.includes('auto-review') && m.visibility !== 'hide')
       .map((m) => ({
         id: m.slug as string,
         label: (m.display_name as string) ?? m.slug,

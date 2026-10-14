@@ -47,4 +47,15 @@ describe('ModelPicker', () => {
     act(() => (host.querySelector('button') as HTMLButtonElement).click());
     expect(onPick).toHaveBeenLastCalledWith('claude', 'haiku', undefined);
   });
+
+  it('starts on the first offered model when the default is no longer offered', () => {
+    const host = document.createElement('div');
+    const onPick = vi.fn();
+    const gone = { ...defaults, gemini: { model: 'gemini-2-ultra', effort: 'high' } };
+    act(() => createRoot(host).render(<ModelPicker models={models} defaults={gone} fixedProvider="gemini" submitLabel="Add" onPick={onPick} />));
+    const model = host.querySelectorAll('select')[0] as HTMLSelectElement;
+    expect([...model.options].map((o) => o.value)).toEqual(['gemini-3.1-pro', 'gemini-3.8-flash']);
+    act(() => (host.querySelector('button') as HTMLButtonElement).click());
+    expect(onPick).toHaveBeenLastCalledWith('gemini', 'gemini-3.1-pro', 'high');
+  });
 });

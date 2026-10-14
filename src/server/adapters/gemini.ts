@@ -6,7 +6,6 @@ import { runJsonl } from './process.js';
 import { DEFAULT_TIMEOUT_MS, hostOf, type AdapterEvent, type CliOptions, type ImageInput, type ProviderAdapter, type SendRequest } from './types.js';
 
 const FALLBACK_MODELS: ModelOption[] = [
-  { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro', efforts: ['high', 'low'] },
   { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', efforts: ['high', 'medium', 'low'] },
 ];
 const EFFORT_SUFFIX = /^(.+)-(high|medium|low)$/;

@@ -102,12 +102,13 @@ describe('codex adapter', () => {
     expect(events.at(-1)).toMatchObject({ type: 'error', error: { code: 'rate_limited' } });
   });
 
-  it('lists models from the Codex cache, without review-only models', async () => {
+  it('lists models from the Codex cache, without review-only or hidden models', async () => {
     const home = mkdtempSync(join(tmpdir(), 'codex-home-'));
     writeFileSync(join(home, 'models_cache.json'), JSON.stringify({
       models: [
         { slug: 'gpt-6-luna', display_name: 'GPT-6-Luna', description: 'Fast and affordable model for easier tasks.', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }] },
         { slug: 'codex-auto-review', display_name: 'Codex Auto Review', supported_reasoning_levels: [] },
+        { slug: 'gpt-reserve', display_name: 'GPT Reserve', visibility: 'hide', supported_reasoning_levels: [{ effort: 'high' }] },
       ],
     }));
     const { adapter } = setup(OK_RUN, home);

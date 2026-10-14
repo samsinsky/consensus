@@ -12,7 +12,12 @@ type Props = {
 
 export function ModelPicker({ models, defaults, fixedProvider, initial, submitLabel, onPick }: Props) {
   const [provider, setProvider] = useState<ProviderId>(initial?.provider ?? fixedProvider ?? 'claude');
-  const [model, setModel] = useState(initial?.model ?? defaults[provider].model);
+  // A saved default the provider no longer offers falls back to its first model.
+  const startModel = (p: ProviderId) => {
+    const offered = models[p] ?? [];
+    return offered.some((m) => m.id === defaults[p].model) ? defaults[p].model : offered[0]?.id ?? defaults[p].model;
+  };
+  const [model, setModel] = useState(initial?.model ?? startModel(provider));
   const [effort, setEffort] = useState(initial?.effort ?? defaults[provider].effort ?? '');
   const options = models[provider] ?? [];
   const efforts = options.find((m) => m.id === model)?.efforts ?? [];
@@ -22,7 +27,7 @@ export function ModelPicker({ models, defaults, fixedProvider, initial, submitLa
 
   const changeProvider = (p: ProviderId) => {
     setProvider(p);
-    setModel(defaults[p].model);
+    setModel(startModel(p));
     setEffort(defaults[p].effort ?? '');
   };
 
