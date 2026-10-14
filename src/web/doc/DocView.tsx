@@ -18,6 +18,7 @@ import { ProposalCard, StaleCard } from './ProposalCard.js';
 import { ProposalHighlights, showProposals } from './proposalDecorations.js';
 import { ResolvedList } from './ResolvedList.js';
 import { ReviewBar } from './ReviewBar.js';
+import { useAutoGrow } from '../useAutoGrow.js';
 
 const SAVE_DELAY = 1000;
 const highlights = [ProposalHighlights];
@@ -41,6 +42,8 @@ export function DocView({ thread, activity, models, defaults }: Props) {
   const [error, setError] = useState<string>();
   const [copied, setCopied] = useState(false);
   const [brief, setBrief] = useState(doc.brief);
+  const briefBox = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(briefBox, brief);
   const pending = useRef<Pending>({});
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const revision = useRef(doc.revision);
@@ -258,34 +261,6 @@ export function DocView({ thread, activity, models, defaults }: Props) {
               )}
             </button>
           </div>
-          <div className="brief">
-            <textarea
-              className="brief-input"
-              rows={2}
-              placeholder="Brief: what this is, who reads it, and any limits"
-              value={brief}
-              onChange={(e) => {
-                setBrief(e.target.value);
-                queue({ brief: e.target.value });
-              }}
-            />
-            <button className="ghost attach" onClick={() => filePicker.current?.click()} title="Attach files to the brief" aria-label="Attach files to the brief">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-              </svg>
-            </button>
-            <input ref={filePicker} type="file" multiple hidden onChange={(e) => {
-              attach([...(e.target.files ?? [])]);
-              e.target.value = '';
-            }} />
-            {doc.briefAttachments?.length ? (
-              <div className="att-row">
-                {doc.briefAttachments.map((a) => (
-                  <AttachmentChip key={a.id} threadId={thread.id} name={a.name} size={a.size} attachment={a} onRemove={() => detach(a.id)} />
-                ))}
-              </div>
-            ) : null}
-          </div>
           <DocEditor
             markdown={doc.markdown}
             revision={doc.revision}
@@ -305,15 +280,52 @@ export function DocView({ thread, activity, models, defaults }: Props) {
           version={version + doc.proposals.length}
         />
       </div>
-      <ReviewBar
-        thread={thread}
-        models={models}
-        defaults={defaults}
-        activity={activity}
-        running={running}
-        onSend={send}
-        onStop={() => attempt(() => api.stopRound(thread.id))}
-      />
+      <div className="doc-composer">
+        <ReviewBar
+          thread={thread}
+          models={models}
+          defaults={defaults}
+          activity={activity}
+          running={running}
+          onSend={send}
+          onStop={() => attempt(() => api.stopRound(thread.id))}
+        />
+        {doc.briefAttachments?.length ? (
+          <div className="att-row">
+            {doc.briefAttachments.map((a) => (
+              <AttachmentChip key={a.id} threadId={thread.id} name={a.name} size={a.size} attachment={a} onRemove={() => detach(a.id)} />
+            ))}
+          </div>
+        ) : null}
+        <div className="input-wrap">
+          <button className="ghost attach" onClick={() => filePicker.current?.click()} title="Attach files to the brief" aria-label="Attach files to the brief">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
+          <input ref={filePicker} type="file" multiple hidden onChange={(e) => {
+            attach([...(e.target.files ?? [])]);
+            e.target.value = '';
+          }} />
+          <textarea
+            ref={briefBox}
+            className="brief-input"
+            rows={1}
+            placeholder="Brief for reviewers: what this is, who reads it, any limits. Cmd+Enter to send."
+            value={brief}
+            onChange={(e) => {
+              setBrief(e.target.value);
+              queue({ brief: e.target.value });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !running && doc.included.length) {
+                e.preventDefault();
+                send();
+              }
+            }}
+          />
+        </div>
+      </div>
     </section>
   );
 }

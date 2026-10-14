@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { participantLabel } from '../../shared/labels.js';
 import type { ModelOption, ProviderDefaults, ProviderId, Quote, Thread } from '../../shared/types.js';
+import { useAutoGrow } from '../useAutoGrow.js';
 import { api } from '../api.js';
 import { autoQuote, streamingReply } from '../threadState.js';
 import { useAttachments } from '../useAttachments.js';
@@ -40,13 +41,7 @@ export function Composer({ thread, models, defaults, target, lockTarget, onTarge
   const outgoing = quotes.length ? quotes : auto ? [auto] : [];
   const canSend = !!target && !running && !sending && !uploading && (text.trim().length > 0 || outgoing.length > 0 || ready.length > 0);
 
-  // Grow with the text; CSS caps the height at ten lines and scrolls beyond that.
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
-  }, [text]);
+  useAutoGrow(box, text);
 
   const remove = (q: Quote) => {
     if (q === auto) setDismissed((d) => new Set(d).add(q.messageId));
