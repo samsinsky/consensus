@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
-import { participantLabel } from '../../shared/labels.js';
+import { modelLabel, participantName } from '../../shared/labels.js';
 import type { Participant, Round } from '../../shared/types.js';
 
 type Props = { participant: Participant; all: Participant[]; rounds: Round[]; activity?: string; roundRunning: boolean; latestRound: number; onRetry: () => void };
@@ -29,8 +29,9 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
   if (!open) {
     return (
       <button className="card note note-line" onClick={() => setOpen(true)}>
-        <span className="author"><span className={`dot ${participant.provider}`} /> {participantLabel(participant, all)}</span>
+        <span className="author"><span className={`dot ${participant.provider}`} /> {participantName(participant, all)}</span>
         <span className="note-summary">{summary(note, activity)}</span>
+        <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
       </button>
     );
   }
@@ -38,7 +39,10 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
   return (
     <div className="card note">
       <div className="card-head">
-        <span className="author" onClick={() => setOpen(false)} title="Collapse"><span className={`dot ${participant.provider}`} /> {participantLabel(participant, all)}</span>
+        <span className="author" onClick={() => setOpen(false)} title="Collapse">
+          <span className={`dot ${participant.provider}`} /> {participantName(participant, all)}
+          <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
+        </span>
         {rounds.length > 1 && (
           <select value={round.n} onChange={(e) => setPicked(Number(e.target.value))}>
             {rounds.map((r) => <option key={r.n} value={r.n}>Round {r.n}</option>)}
