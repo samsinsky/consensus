@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { stackCards } from './marginLayout.js';
 
 type Item = { key: string; anchor: number; node: ReactNode };
@@ -7,13 +7,16 @@ type Props = { header: ReactNode; footer: ReactNode; items: Item[]; focused?: st
 /** Notes pinned on top, then one card per proposal level with its text, then the resolved line. */
 export function Margin({ header, footer, items, focused, topOf, version }: Props) {
   const area = useRef<HTMLDivElement>(null);
+  const aside = useRef<HTMLElement>(null);
   const [tops, setTops] = useState<Record<string, number>>({});
 
   const slots = useRef(new Map<string, HTMLElement>());
   const measure = () => {
     const el = area.current;
     if (!el) return;
-    const areaTop = el.getBoundingClientRect().top;
+    // The margin scrolls on its own, so measure in its content coordinates; topOf does the same for the document.
+    const box = aside.current;
+    const areaTop = el.getBoundingClientRect().top - (box ? box.getBoundingClientRect().top - box.scrollTop : 0);
     const measured = items.map((i) => ({
       id: i.key,
       top: topOf(i.anchor) - areaTop,
@@ -39,9 +42,14 @@ export function Margin({ header, footer, items, focused, topOf, version }: Props
     return () => ro.disconnect();
   }, [keys]);
 
+  // Bring the picked card into view when its text is clicked.
+  useEffect(() => {
+    if (focused) slots.current.get(focused)?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [focused]);
+
   const bottom = Math.max(0, ...items.map((i) => (tops[i.key] ?? 0) + 200));
   return (
-    <aside className="margin">
+    <aside className="margin" ref={aside}>
       <div className="notes">{header}</div>
       <div className="cards" ref={area} style={{ minHeight: bottom }} data-version={version}>
         {items.map((i) => (

@@ -54,4 +54,17 @@ describe('Margin', () => {
     act(() => live.forEach((o) => o.cb()));
     expect(slot('b').style.top).toBe('58px');
   });
+
+  it('places cards the same way however far the margin has scrolled', () => {
+    const items = [{ key: 'a', anchor: 300, node: <div>A</div> }];
+    const aside = () => host.querySelector('aside.margin') as HTMLElement;
+    const cards = () => host.querySelector('.cards') as HTMLElement;
+    act(() => root.render(<Margin header={null} footer={null} items={items} topOf={(p) => p} version={1} />));
+    // Scrolled down 120px: the cards area moves up on screen by the same amount.
+    Object.defineProperty(aside(), 'scrollTop', { configurable: true, value: 120 });
+    aside().getBoundingClientRect = () => ({ top: 50 } as DOMRect);
+    cards().getBoundingClientRect = () => ({ top: 50 + 40 - 120 } as DOMRect);
+    act(() => FakeRO.instances.filter((o) => !o.disconnected).forEach((o) => o.cb()));
+    expect((host.querySelector('[data-card="a"]') as HTMLElement).style.top).toBe('260px');
+  });
 });

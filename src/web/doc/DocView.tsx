@@ -43,6 +43,7 @@ export function DocView({ thread, activity, models, defaults }: Props) {
   const [copied, setCopied] = useState(false);
   const [brief, setBrief] = useState(doc.brief);
   const briefBox = useRef<HTMLTextAreaElement>(null);
+  const docPane = useRef<HTMLDivElement>(null);
   useAutoGrow(briefBox, brief);
   const pending = useRef<Pending>({});
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -189,7 +190,10 @@ export function DocView({ thread, activity, models, defaults }: Props) {
 
   const topOf = (pos: number) => {
     try {
-      return editor ? editor.view.coordsAtPos(pos).top : 0;
+      if (!editor) return 0;
+      // Document content coordinates: unchanged by scrolling the document pane.
+      const pane = docPane.current;
+      return editor.view.coordsAtPos(pos).top - (pane ? pane.getBoundingClientRect().top - pane.scrollTop : 0);
     } catch {
       return 0;
     }
@@ -245,31 +249,33 @@ export function DocView({ thread, activity, models, defaults }: Props) {
         <ThreadTitle thread={thread} />
       </header>
       <div className="doc-scroll">
-        <div className="doc-main">
-          <div className="doc-tools">
-            {saveState === 'error' && <span className="not-saved" title={error}>Not saved</span>}
-            <HistoryMenu rounds={doc.rounds} onRestore={async (n) => {
-              clearTimeout(timer.current);
-              pending.current = {};
-              await api.restore(thread.id, n);
-            }} />
-            <button className="ghost icon-btn" title="Copy" aria-label="Copy" onClick={copy}>
-              {copied ? 'Copied' : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" />
-                </svg>
-              )}
-            </button>
+        <div className="doc-pane" ref={docPane}>
+          <div className="doc-main">
+            <div className="doc-tools">
+              {saveState === 'error' && <span className="not-saved" title={error}>Not saved</span>}
+              <HistoryMenu rounds={doc.rounds} onRestore={async (n) => {
+                clearTimeout(timer.current);
+                pending.current = {};
+                await api.restore(thread.id, n);
+              }} />
+              <button className="ghost icon-btn" title="Copy" aria-label="Copy" onClick={copy}>
+                {copied ? 'Copied' : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <DocEditor
+              markdown={doc.markdown}
+              revision={doc.revision}
+              extensions={highlights}
+              onChange={(md) => queue({ markdown: md })}
+              onReady={setEditor}
+              onPick={setFocused}
+            />
+            {error && <p className="error-inline">{error}</p>}
           </div>
-          <DocEditor
-            markdown={doc.markdown}
-            revision={doc.revision}
-            extensions={highlights}
-            onChange={(md) => queue({ markdown: md })}
-            onReady={setEditor}
-            onPick={setFocused}
-          />
-          {error && <p className="error-inline">{error}</p>}
         </div>
         <Margin
           header={header}
