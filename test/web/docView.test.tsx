@@ -97,6 +97,18 @@ describe('DocView', () => {
     await act(async () => click(button('Restore')));
     expect(api.restore).toHaveBeenCalledWith('t', 1);
   });
+
+  it('closes the history picker on a click outside it or Escape', async () => {
+    await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
+    const toggle = host.querySelector('button[title="History"]')!;
+    click(toggle);
+    expect(host.querySelector('.history-menu')).not.toBeNull();
+    act(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    expect(host.querySelector('.history-menu')).toBeNull();
+    click(toggle);
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(host.querySelector('.history-menu')).toBeNull();
+  });
   const typeBrief = (text: string) => {
     const brief = host.querySelector('textarea.brief-input') as HTMLTextAreaElement;
     act(() => {
