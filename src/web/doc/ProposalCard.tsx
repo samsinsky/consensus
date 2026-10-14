@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { participantLabel } from '../../shared/labels.js';
 import { stanceCounts } from '../../shared/proposals.js';
 import type { Participant, Proposal, ProposalReply } from '../../shared/types.js';
+import { useAutoGrow } from '../useAutoGrow.js';
 import type { Group } from './anchoring.js';
 
 const LETTERS = 'ABCDEFGHIJ';
@@ -38,6 +39,8 @@ export function ProposalCard({ group, shown, participants, focused, onFocus, onP
   const current = options.find((p) => p.id === shown) ?? options[0];
   const index = options.indexOf(current);
   const [draft, setDraft] = useState(current.replacement);
+  const draftBox = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(draftBox, draft);
   useEffect(() => setDraft(current.replacement), [current.id, current.replacement]);
   const many = options.length > 1;
 
@@ -64,8 +67,9 @@ export function ProposalCard({ group, shown, participants, focused, onFocus, onP
         </>
       )}
       <textarea
+        ref={draftBox}
         className="replacement"
-        rows={2}
+        rows={1}
         value={draft}
         onClick={(e) => e.stopPropagation()}
         onChange={(e) => setDraft(e.target.value)}
@@ -124,6 +128,8 @@ function Replies({ replies, participants }: { replies: ProposalReply[]; particip
 
 function ReplyBox({ onSend }: { onSend: (text: string) => Promise<void> }) {
   const [text, setText] = useState('');
+  const replyBox = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(replyBox, text);
   const [error, setError] = useState<string>();
   const send = async () => {
     if (!text.trim()) return;
@@ -138,6 +144,7 @@ function ReplyBox({ onSend }: { onSend: (text: string) => Promise<void> }) {
   return (
     <div className="reply-box" onClick={(e) => e.stopPropagation()}>
       <textarea
+        ref={replyBox}
         rows={1}
         placeholder="Reply…"
         value={text}

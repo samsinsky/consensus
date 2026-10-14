@@ -7,5 +7,7 @@ export function useAutoGrow(box: RefObject<HTMLTextAreaElement | null>, text: st
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+    // Show a scrollbar only once the CSS cap stops the growth.
+    el.style.overflowY = el.scrollHeight > el.clientHeight + 1 ? 'auto' : 'hidden';
   }, [box, text]);
 }
