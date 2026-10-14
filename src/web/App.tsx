@@ -102,7 +102,10 @@ export function App() {
         ) : (
           <div className="empty">
             <p>Pick a thread or start a new one.</p>
-            <button onClick={() => newThread()}>New thread</button>
+            <span className="empty-actions">
+              <button onClick={() => newThread('chat')}>New chat</button>
+              <button onClick={() => newThread('doc')}>New doc</button>
+            </span>
           </div>
         )}
       </main>
