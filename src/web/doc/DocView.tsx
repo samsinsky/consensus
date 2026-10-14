@@ -293,8 +293,6 @@ export function DocView({ thread, activity, models, defaults }: Props) {
           defaults={defaults}
           activity={activity}
           running={running}
-          onSend={send}
-          onStop={() => attempt(() => api.stopRound(thread.id))}
         />
         {doc.briefAttachments?.length ? (
           <div className="att-row">
@@ -330,6 +328,18 @@ export function DocView({ thread, activity, models, defaults }: Props) {
               }
             }}
           />
+          {running ? (
+            <button className="send-btn stop" onClick={() => attempt(() => api.stopRound(thread.id))} title="Stop" aria-label="Stop">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+            </button>
+          ) : (
+            <button className="send-btn" disabled={!doc.included.length} onClick={send} title="Send for review (Cmd+Enter)" aria-label="Send">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 19V5" />
+                <path d="m5 12 7-7 7 7" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </section>

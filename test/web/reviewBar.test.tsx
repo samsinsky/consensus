@@ -36,8 +36,8 @@ afterEach(() => {
   host.remove();
 });
 const click = (el: Element) => act(() => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-const render = (t: Thread, props: Partial<{ onSend: () => void; onStop: () => void; activity: Record<string, string> }> = {}) =>
-  act(() => root.render(<ReviewBar thread={t} models={models} defaults={defaults} activity={props.activity ?? {}} running={t.doc!.rounds.some((r) => Object.values(r.notes).some((n) => n.status === 'running'))} onSend={props.onSend ?? (() => {})} onStop={props.onStop ?? (() => {})} />));
+const render = (t: Thread, props: Partial<{ activity: Record<string, string> }> = {}) =>
+  act(() => root.render(<ReviewBar thread={t} models={models} defaults={defaults} activity={props.activity ?? {}} running={t.doc!.rounds.some((r) => Object.values(r.notes).some((n) => n.status === 'running'))} />));
 
 describe('review summary', () => {
   const summary = () => host.querySelector('.review-summary')!;
@@ -67,14 +67,8 @@ describe('ReviewBar', () => {
     expect([...host.querySelectorAll('button')].some((b) => b.textContent === '+ Add participant')).toBe(true);
   });
 
-  it('disables Send with nobody included, and shows Stop and activity while running', () => {
-    const onStop = vi.fn();
-    render(thread([]));
-    expect((host.querySelector('.review-send') as HTMLButtonElement).disabled).toBe(true);
-    render(thread(['a'], true), { onStop, activity: { 'doc:a': 'Reading x.com' } });
-    expect(host.querySelector('.review-send')!.textContent).toBe('Stop');
+  it('shows each running reviewer\'s activity', () => {
+    render(thread(['a'], true), { activity: { 'doc:a': 'Reading x.com' } });
     expect(host.textContent).toContain('Reading x.com');
-    click(host.querySelector('.review-send')!);
-    expect(onStop).toHaveBeenCalled();
   });
 });

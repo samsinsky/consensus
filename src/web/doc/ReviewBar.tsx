@@ -10,8 +10,6 @@ type Props = {
   defaults: Record<ProviderId, ProviderDefaults>;
   activity: Record<string, string>;
   running: boolean;
-  onSend: () => void;
-  onStop: () => void;
 };
 
 /** Up to three included reviewers, each with its model as a subtitle, then "+ N more". */
@@ -31,7 +29,7 @@ function Summary({ thread }: { thread: Thread }) {
   );
 }
 
-export function ReviewBar({ thread, models, defaults, activity, running, onSend, onStop }: Props) {
+export function ReviewBar({ thread, models, defaults, activity, running }: Props) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string>();
@@ -76,9 +74,6 @@ export function ReviewBar({ thread, models, defaults, activity, running, onSend,
           ))}
         </span>
       )}
-      <button className="review-send" disabled={!running && !included.size} onClick={running ? onStop : onSend}>
-        {running ? 'Stop' : 'Send'}
-      </button>
       {open && (
         <div className="chip-menu review-menu">
           {thread.participants.map((p) => (

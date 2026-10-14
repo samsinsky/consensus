@@ -82,7 +82,7 @@ describe('DocView', () => {
         brief.dispatchEvent(new Event('input', { bubbles: true }));
       });
       expect(api.saveDoc).not.toHaveBeenCalled();
-      await act(async () => click(host.querySelector('.review-send')!));
+      await act(async () => click(host.querySelector('.send-btn')!));
       expect(api.saveDoc).toHaveBeenCalledWith('t', { revision: 0, brief: 'LinkedIn bio, 150 words' });
       expect(api.startRound).toHaveBeenCalledWith('t');
     } finally {
@@ -114,7 +114,7 @@ describe('DocView', () => {
       typeBrief('edited');
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
       expect(api.saveDoc).toHaveBeenCalledTimes(1);
-      await act(async () => click(host.querySelector('.review-send')!));
+      await act(async () => click(host.querySelector('.send-btn')!));
       expect(api.startRound).not.toHaveBeenCalled();
       await act(async () => { resolveSave(); await Promise.resolve(); });
       expect(api.startRound).toHaveBeenCalledWith('t');
@@ -132,7 +132,7 @@ describe('DocView', () => {
       await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
       typeBrief('edited');
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-      await act(async () => click(host.querySelector('.review-send')!));
+      await act(async () => click(host.querySelector('.send-btn')!));
       await act(async () => { rejectSave(new Error('busy')); await Promise.resolve(); });
       expect(api.startRound).not.toHaveBeenCalled();
     } finally {
@@ -155,7 +155,7 @@ describe('DocView', () => {
       restored.doc!.revision = 1;
       await act(async () => root.render(<DocView thread={restored} activity={{}} models={models} defaults={defaults} />));
       await act(async () => { rejectSave(new Error('busy')); await Promise.resolve(); });
-      await act(async () => click(host.querySelector('.review-send')!));
+      await act(async () => click(host.querySelector('.send-btn')!));
       expect(api.saveDoc).toHaveBeenCalledTimes(1);
       expect(api.startRound).toHaveBeenCalledWith('t');
     } finally {
@@ -171,7 +171,7 @@ describe('DocView', () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
       expect(host.textContent).toContain('Not saved');
       expect(host.querySelector('.error-inline')?.textContent).toBe('busy');
-      await act(async () => click(host.querySelector('.review-send')!));
+      await act(async () => click(host.querySelector('.send-btn')!));
       expect(api.saveDoc).toHaveBeenCalledTimes(2);
       expect(host.querySelector('.error-inline')).toBeNull();
       expect(api.saveDoc).toHaveBeenLastCalledWith('t', { revision: 0, brief: 'edited' });
@@ -197,5 +197,20 @@ describe('DocView', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('sends from an arrow inside the brief box, disabled with nobody included, and stops a running round', async () => {
+    const t = thread();
+    t.doc!.included = [];
+    act(() => root.render(<DocView thread={t} activity={{}} models={models} defaults={defaults} />));
+    const arrow = () => host.querySelector('.input-wrap .send-btn') as HTMLButtonElement;
+    expect(arrow().disabled).toBe(true);
+    expect(host.querySelector('.review-send')).toBeNull();
+    const running = thread();
+    running.doc!.rounds[0].notes.a = { status: 'running' };
+    act(() => root.render(<DocView thread={running} activity={{}} models={models} defaults={defaults} />));
+    expect(arrow().getAttribute('aria-label')).toBe('Stop');
+    await act(async () => click(arrow()));
+    expect(api.stopRound).toHaveBeenCalledWith('t');
   });
 });
