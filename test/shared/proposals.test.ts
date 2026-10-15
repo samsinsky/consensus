@@ -8,14 +8,28 @@ const prop = (over: Partial<Proposal>): Proposal => ({
 });
 
 describe('groupOverlaps', () => {
-  it('groups ranges that overlap and leaves touching ranges apart', () => {
+  it('groups ranges that mostly cover the same text as versions, and leaves touching ranges apart', () => {
     expect(groupOverlaps([
       { id: 'P1', start: 0, end: 10 },
-      { id: 'P2', start: 5, end: 8 },
+      { id: 'P2', start: 2, end: 10 },
       { id: 'P3', start: 10, end: 12 },
-      { id: 'P4', start: 11, end: 20 },
       { id: 'P5', start: 30, end: 31 },
-    ])).toEqual([['P1', 'P2'], ['P3', 'P4'], ['P5']]);
+    ])).toEqual([['P1', 'P2'], ['P3'], ['P5']]);
+  });
+
+  it('keeps a small edit inside a larger rewrite as its own suggestion', () => {
+    expect(groupOverlaps([
+      { id: 'P1', start: 0, end: 200 },
+      { id: 'P2', start: 40, end: 41 },
+      { id: 'P3', start: 0, end: 190 },
+    ])).toEqual([['P1', 'P3'], ['P2']]);
+  });
+
+  it('keeps ranges that only clip each other apart', () => {
+    expect(groupOverlaps([
+      { id: 'P1', start: 0, end: 10 },
+      { id: 'P2', start: 8, end: 20 },
+    ])).toEqual([['P1'], ['P2']]);
   });
 });
 

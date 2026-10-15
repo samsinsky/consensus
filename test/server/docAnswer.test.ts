@@ -26,6 +26,15 @@ describe('parseAnswer', () => {
     expect(r).toEqual({ ok: true, value: { proposals: [], replies: [], note: 'Fine.' } });
   });
 
+  it('reads a verdict, and rejects an unknown one', () => {
+    expect(parseAnswer(block({ verdict: 'dont_send', note: 'Call instead.' }), known)).toEqual({
+      ok: true, value: { verdict: 'dont_send', proposals: [], replies: [], note: 'Call instead.' },
+    });
+    expect(parseAnswer(block({ verdict: 'maybe' }), known)).toEqual({
+      ok: false, reason: 'had a "verdict" other than "send", "revise", "rethink" or "dont_send"',
+    });
+  });
+
   it('treats missing lists and note as empty', () => {
     expect(parseAnswer(block({}), known)).toEqual({ ok: true, value: { proposals: [], replies: [], note: '' } });
   });

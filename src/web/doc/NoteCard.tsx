@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
 import { modelLabel, participantName } from '../../shared/labels.js';
-import type { Participant, Round } from '../../shared/types.js';
+import type { Participant, Round, Verdict } from '../../shared/types.js';
 
 type Props = { participant: Participant; all: Participant[]; rounds: Round[]; activity?: string; roundRunning: boolean; latestRound: number; onRetry: () => void };
 
 const PREVIEW = 80;
+
+const VERDICT_LABEL: Record<Verdict, string> = { send: 'Send', revise: 'Revise', rethink: 'Rethink', dont_send: "Don't send" };
 
 function summary(note: { status: string; note?: string }, activity?: string): string {
   if (note.status === 'running') return activity ? `${activity}…` : 'Reviewing…';
@@ -24,6 +26,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
   const note = round?.notes[participant.id];
   if (!round || !note) return null;
   const canRetry = round.n === latestRound;
+  const verdict = note.verdict && <span className={`tag verdict ${note.verdict}`}>{VERDICT_LABEL[note.verdict]}</span>;
   const retry = <button disabled={roundRunning} title={roundRunning ? 'Wait for the other reviews to finish' : undefined} onClick={onRetry}>Retry</button>;
 
   if (!open) {
@@ -32,6 +35,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
         <span className="author">
           <span className={`dot ${participant.provider}`} /> {participantName(participant, all)}
           <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
+          {verdict}
         </span>
         <span className="note-summary">{summary(note, activity)}</span>
       </button>
@@ -44,6 +48,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
         <span className="author" onClick={() => setOpen(false)} title="Collapse">
           <span className={`dot ${participant.provider}`} /> {participantName(participant, all)}
           <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
+          {verdict}
         </span>
         {rounds.length > 1 && (
           <select value={round.n} onChange={(e) => setPicked(Number(e.target.value))}>

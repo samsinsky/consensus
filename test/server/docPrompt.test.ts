@@ -64,11 +64,23 @@ describe('composeRound', () => {
 });
 
 describe('ROUND_TASK', () => {
-  it('asks for fixes only, replies, one note, no full rewrite, and the JSON block', () => {
-    expect(ROUND_TASK).toContain('Propose changes only to fix real problems');
+  it('puts strategy first, every round, with alternatives and a verdict', () => {
+    expect(ROUND_TASK).toMatch(/^What to do, in this order:\n1\. Think about strategy first/);
+    expect(ROUND_TASK).toContain('even if you liked an earlier draft');
+    expect(ROUND_TASK).toContain('two or three materially different ways');
+    expect(ROUND_TASK).toContain('"dont_send"');
+  });
+
+  it('keeps big calls and starting over in the note, and allows suggestions of any size, biggest first', () => {
+    expect(ROUND_TASK).toContain('explain the new direction in your note instead of rewriting it');
+    expect(ROUND_TASK).toContain('rewrite a whole paragraph around a better example');
+    expect(ROUND_TASK).toContain('biggest first');
+    expect(ROUND_TASK).not.toContain("Don't rewrite the whole document.");
+  });
+
+  it('asks for replies and a JSON block that leads with the verdict and note', () => {
     expect(ROUND_TASK).toContain('"your call" when it comes down to taste');
-    expect(ROUND_TASK).toContain("Don't rewrite the whole document.");
-    expect(ROUND_TASK).toContain('```json');
+    expect(ROUND_TASK).toMatch(/```json\n\{\n  "verdict": .*\n  "note": .*\n  "proposals": .*\n  "replies": /);
   });
 });
 

@@ -234,4 +234,14 @@ describe('DocService rounds', () => {
     await done;
     expect(await router.getThread(t.id)).toBeUndefined();
   });
+
+  it('stores each reviewer\'s verdict with its note', async () => {
+    const { t, a } = await docWithTwo();
+    t.doc!.included = [a.id];
+    const { done } = await docs.startRound(t.id);
+    expect(claude.requests[0].message).toContain('Think about strategy first');
+    answer(claude, json({ verdict: 'rethink', note: 'Lead with a better example.' }));
+    await done;
+    expect((await router.getThread(t.id))!.doc!.rounds[0].notes[a.id]).toMatchObject({ status: 'done', verdict: 'rethink', note: 'Lead with a better example.' });
+  });
 });

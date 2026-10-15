@@ -125,8 +125,11 @@ export type Proposal = {
   replies: ProposalReply[];
 };
 
+export type Verdict = 'send' | 'revise' | 'rethink' | 'dont_send';
+
 export type RoundNote = {
   status: 'running' | 'done' | 'stopped' | 'error';
+  verdict?: Verdict;
   note?: string;
   /** The participant's full prose answer. */
   answer?: string;

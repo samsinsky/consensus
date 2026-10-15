@@ -1,17 +1,23 @@
 import type { DocState, Proposal, ProposalReply } from '../shared/types.js';
 
 export const ROUND_TASK =
-  'What to do:\n' +
-  '1. Propose changes only to fix real problems: errors, unclear writing, or anything that misses the brief. If a change comes down to taste, leave it.\n' +
-  '2. Reply to each open proposal you didn\'t write: agree, disagree with a reason, or "your call" when it comes down to taste.\n' +
-  '3. Leave one short note on the whole draft: structure, direction, and anything line edits would miss.\n' +
-  "4. Don't rewrite the whole document.\n\n" +
+  'What to do, in this order:\n' +
+  '1. Think about strategy first, fresh every round, even if you liked an earlier draft. What is this for, and who reads it? ' +
+  'Come up with two or three materially different ways to do it, such as a different example, angle or structure, or not sending it at all, and weigh them against the draft.\n' +
+  '2. Give a verdict. "send": it works, with small fixes at most. "revise": keep the approach and fix real problems. ' +
+  '"rethink": the structure, content or approach has to change. "dont_send": I shouldn\'t send this at all.\n' +
+  '3. Leave a note on the whole draft that explains your verdict. Big calls go here: change the flow, start over, don\'t send. ' +
+  'If the piece should start over, explain the new direction in your note instead of rewriting it.\n' +
+  '4. Propose changes of any size, biggest first. A suggestion can fix a comma or rewrite a whole paragraph around a better example. ' +
+  "Don't polish wording in a section you're proposing to replace. If a change comes down to taste, leave it.\n" +
+  '5. Reply to each open proposal you didn\'t write: agree, disagree with a reason, or "your call" when it comes down to taste.\n\n' +
   'End your answer with one JSON block in exactly this shape:\n' +
   '```json\n' +
   '{\n' +
+  '  "verdict": "send" | "revise" | "rethink" | "dont_send",\n' +
+  '  "note": "your note on the whole draft",\n' +
   '  "proposals": [{ "quote": "exact words from the document", "replacement": "new words", "reason": "one or two sentences" }],\n' +
-  '  "replies": [{ "proposal": "P4", "stance": "agree" | "disagree" | "your_call", "text": "one or two sentences" }],\n' +
-  '  "note": "your note on the whole draft"\n' +
+  '  "replies": [{ "proposal": "P4", "stance": "agree" | "disagree" | "your_call", "text": "one or two sentences" }]\n' +
   '}\n' +
   '```\n' +
   'For "quote", copy the exact words from the document without formatting marks, long enough to appear only once. ' +

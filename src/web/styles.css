@@ -212,11 +212,15 @@ body.resizing { cursor: col-resize; user-select: none; }
 .card .author { display: inline-flex; align-items: center; gap: 6px; }
 .note.note-line, .card.stale.stale-line { flex-direction: row; align-items: center; gap: 8px; width: 100%; text-align: left; cursor: pointer; padding: 6px 10px; overflow: hidden; white-space: nowrap; font: inherit; font-size: 13px; color: inherit; }
 .note.note-line { flex-direction: column; align-items: stretch; gap: 2px; }
-.note-model { color: var(--muted); font-size: 11px; font-weight: normal; margin-left: 6px; }
+.note-model { color: var(--muted); font-size: 11px; font-weight: normal; margin-left: 6px; white-space: nowrap; }
 .note.note-line .author { overflow: hidden; text-overflow: ellipsis; }
 .note.note-line .note-summary { padding-left: 16px; }
 .note.note-line .author, .card.stale.stale-line .author { flex: none; }
 .note .note-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .card.stale.stale-line .tag { flex: none; }
 .note .author, .card.stale .author { cursor: pointer; }
+.tag.verdict { margin-left: 6px; font-weight: normal; }
+.tag.verdict.send { border-color: var(--codex); color: var(--codex); }
+.tag.verdict.rethink { border-color: var(--claude); color: var(--claude); }
+.tag.verdict.dont_send { border-color: var(--error); color: var(--error); }
 .review-summary .note-model { margin-left: 2px; font-size: 12px; }

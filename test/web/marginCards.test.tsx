@@ -134,6 +134,14 @@ describe('NoteCard collapsed line', () => {
     expect(host.querySelector('.card-head')).not.toBeNull();
   });
 
+  it('tags the reviewer with its verdict, collapsed and expanded, and shows no tag without one', () => {
+    expect(line(round({ notes: { a: { status: 'done', note: 'Fine.' } } })).querySelector('.tag.verdict')).toBeNull();
+    const el = line(round({ notes: { a: { status: 'done', verdict: 'dont_send', note: 'Call instead.' } } }));
+    expect(el.querySelector('.author .tag.verdict.dont_send')!.textContent).toBe("Don't send");
+    click(el);
+    expect(host.querySelector('.card-head .tag.verdict')!.textContent).toBe("Don't send");
+  });
+
   it('keeps a short note whole and shows status words while running, stopped or failed', () => {
     expect(line(round({ notes: { a: { status: 'done', note: 'Tight.' } } })).textContent).toContain('Tight.');
     expect(line(round({ notes: { a: { status: 'done', note: 'Tight.' } } })).textContent).not.toContain('…');

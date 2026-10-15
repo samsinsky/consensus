@@ -268,6 +268,7 @@ export class DocService {
         if (result.status === 'done') {
           if (parsed.ok) {
             note.status = 'done';
+            note.verdict = parsed.value.verdict;
             note.note = parsed.value.note;
             note.rejected = ingest(thread.doc, p.id, round, parsed.value, new Date().toISOString());
           } else {

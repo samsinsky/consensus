@@ -1,6 +1,7 @@
-import type { Stance } from '../shared/types.js';
+import type { Stance, Verdict } from '../shared/types.js';
 
 export type ParsedAnswer = {
+  verdict?: Verdict;
   proposals: { quote: string; replacement: string; reason: string }[];
   replies: { proposal: string; stance: Stance; text: string }[];
   note: string;
@@ -10,6 +11,7 @@ export type ParsedAnswer = {
 export type ParseResult = { ok: true; value: ParsedAnswer } | { ok: false; reason: string };
 
 const STANCES: Stance[] = ['agree', 'disagree', 'your_call'];
+const VERDICTS: Verdict[] = ['send', 'revise', 'rethink', 'dont_send'];
 
 export function parseAnswer(text: string, knownIds: Set<string>): ParseResult {
   const raw = lastJson(text);
@@ -49,6 +51,11 @@ function validate(data: unknown, knownIds: Set<string>): ParseResult {
   const fail = (reason: string): ParseResult => ({ ok: false, reason });
   if (!isObject(data)) return fail('had a JSON block that is not an object');
   const value: ParsedAnswer = { proposals: [], replies: [], note: '' };
+
+  if (data.verdict !== undefined) {
+    if (!VERDICTS.includes(data.verdict as Verdict)) return fail('had a "verdict" other than "send", "revise", "rethink" or "dont_send"');
+    value.verdict = data.verdict as Verdict;
+  }
 
   const proposals = data.proposals ?? [];
   if (!Array.isArray(proposals)) return fail('had "proposals" that is not a list');
