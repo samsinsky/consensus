@@ -28,6 +28,9 @@ export const api = {
     call<void>('PATCH', `/api/threads/${threadId}/participants/${participantId}`, { included }),
   removeParticipant: (threadId: string, participantId: string) => call<void>('DELETE', `/api/threads/${threadId}/participants/${participantId}`),
   startRound: (threadId: string) => call<{ round: number }>('POST', `/api/threads/${threadId}/rounds`),
+  setPhase: (threadId: string, phase: 'strategy' | 'editing') => call<void>('PUT', `/api/threads/${threadId}/doc/phase`, { phase }),
+  startDraft: (threadId: string, participantId: string, direction: string) =>
+    call<{ round: number }>('POST', `/api/threads/${threadId}/draft`, { participantId, direction }),
   stopRound: (threadId: string) => call<void>('POST', `/api/threads/${threadId}/rounds/stop`),
   retryReview: (threadId: string, participantId: string) => call<void>('POST', `/api/threads/${threadId}/participants/${participantId}/retry-review`),
   updateProposal: (threadId: string, proposalId: string, body: { status?: 'accepted' | 'rejected' | 'dismissed'; replacement?: string; notChosen?: string[] }) =>

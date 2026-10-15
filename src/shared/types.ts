@@ -125,9 +125,23 @@ export type Proposal = {
   replies: ProposalReply[];
 };
 
+export type Verdict = 'send' | 'revise' | 'rethink' | 'dont_send';
+
+/** A reviewer's take on the whole draft, before any edits. */
+export type Strategy = {
+  /** The goal and audience as the reviewer reads them. */
+  goal: string;
+  verdict: Verdict;
+  assessment: string;
+  /** The approach the reviewer would take. */
+  approach: string;
+};
+
 export type RoundNote = {
   status: 'running' | 'done' | 'stopped' | 'error';
   note?: string;
+  /** Strategy rounds only. */
+  strategy?: Strategy;
   /** The participant's full prose answer. */
   answer?: string;
   /** Proposals that failed the quote check. */
@@ -135,9 +149,14 @@ export type RoundNote = {
   error?: { code: ErrorCode | 'parse'; message: string; fix?: string };
 };
 
+/** strategy: big-picture takes, no edits. draft: one reviewer rewrites the document to a direction. edit: proposals. */
+export type RoundKind = 'strategy' | 'draft' | 'edit';
+
 export type Round = {
   /** 1-based. */
   n: number;
+  /** Absent means edit. */
+  kind?: RoundKind;
   sentAt: string;
   /** Markdown as sent. */
   snapshot: string;
@@ -154,6 +173,10 @@ export type DocState = {
   revision: number;
   /** Participant ids in the next round. */
   included: string[];
+  /** Absent means editing. */
+  phase?: 'strategy' | 'editing';
+  /** The direction chosen after strategy; edit rounds review against it. */
+  direction?: string;
   rounds: Round[];
   proposals: Proposal[];
   nextProposal: number;

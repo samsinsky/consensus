@@ -208,6 +208,8 @@ describe('doc routes', () => {
 
     expect((await api('PUT', `/api/threads/${id}/doc`, { revision: 0, markdown: 'I have gone deep on LLMs. Really.' })).status).toBe(204);
     expect((await api('PUT', `/api/threads/${id}/doc`, { revision: 5, markdown: 'stale' })).status).toBe(409);
+    expect((await api('PUT', `/api/threads/${id}/doc/phase`, { phase: 'later' })).status).toBe(400);
+    expect((await api('PUT', `/api/threads/${id}/doc/phase`, { phase: 'editing' })).status).toBe(204);
 
     const started = await api('POST', `/api/threads/${id}/rounds`);
     expect(started).toEqual({ status: 202, body: { round: 1 } });
@@ -229,6 +231,22 @@ describe('doc routes', () => {
     const after = (await api('GET', `/api/threads/${id}`)).body as Thread;
     expect(after.doc!.proposals[0]).toMatchObject({ status: 'accepted', replacement: 'studied hard', replies: [{ from: 'user', text: 'Hm.' }] });
     expect(after.doc!.revision).toBe(1);
+  });
+
+  it('starts a draft from a chosen direction', async () => {
+    const id = (await api('POST', '/api/threads', { kind: 'doc', markdown: 'Old.' })).body.id as string;
+    const p = (await api('POST', `/api/threads/${id}/participants`, { provider: 'claude', model: 'claude-model' })).body;
+    expect((await api('POST', `/api/threads/${id}/draft`, { participantId: p.id })).status).toBe(400);
+    expect(await api('POST', `/api/threads/${id}/draft`, { participantId: p.id, direction: 'Shorter.' })).toEqual({ status: 202, body: { round: 1 } });
+    queues.at(-1)!.push({ type: 'done', text: '<document>\nNew.\n</document>' });
+    queues.at(-1)!.end();
+    let thread: Thread;
+    for (let i = 0; i < 50; i++) {
+      thread = (await api('GET', `/api/threads/${id}`)).body;
+      if (thread.doc!.rounds[0].notes[p.id].status !== 'running') break;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(thread!.doc).toMatchObject({ markdown: 'New.', phase: 'editing', direction: 'Shorter.' });
   });
 
   it('toggles inclusion, removes participants, and stops a round', async () => {

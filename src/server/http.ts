@@ -148,6 +148,19 @@ export function createConsensusServer(deps: Deps): Server {
       done.catch((e) => console.error('consensus: review round failed', e));
       json(res, 202, { round });
     }],
+    ['PUT', re(`/api/threads/${ID}/doc/phase`), async (req, res, [id]) => {
+      const body = await readJson(req);
+      if (body.phase !== 'strategy' && body.phase !== 'editing') throw new RouterError('invalid', 'Unknown phase.');
+      await docs.setPhase(id, body.phase);
+      res.writeHead(204).end();
+    }],
+    ['POST', re(`/api/threads/${ID}/draft`), async (req, res, [id]) => {
+      const body = await readJson(req);
+      if (typeof body.participantId !== 'string' || typeof body.direction !== 'string') throw new RouterError('invalid', 'Missing participant or direction.');
+      const { round, done } = await docs.startDraft(id, body.participantId, body.direction);
+      done.catch((e) => console.error('consensus: draft failed', e));
+      json(res, 202, { round });
+    }],
     ['POST', re(`/api/threads/${ID}/rounds/stop`), async (_q, res, [id]) => {
       if (!docs.stopRound(id)) throw new RouterError('not_found', 'No review round is running.');
       res.writeHead(204).end();

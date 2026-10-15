@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { composeRound, repairMessage, ROUND_TASK } from '../../src/server/docPrompt.js';
-import type { DocState, Proposal } from '../../src/shared/types.js';
+import { composeDraft, composeRound, composeStrategy, DRAFT_TASK, repairMessage, ROUND_TASK, STRATEGY_TASK } from '../../src/server/docPrompt.js';
+import type { DocState, Proposal, Round, Strategy } from '../../src/shared/types.js';
 
 const prop = (over: Partial<Proposal>): Proposal => ({
   id: 'P1', round: 1, authors: ['a'], quote: 'gone deep on', prefix: '', suffix: '', replacement: 'gained experience with',
@@ -75,5 +75,69 @@ describe('ROUND_TASK', () => {
 describe('repairMessage', () => {
   it('names the problem and asks for only the JSON block', () => {
     expect(repairMessage('was missing the JSON block')).toBe('Your answer was missing the JSON block. Reply with only the JSON block.');
+  });
+});
+
+describe('composeRound with a direction', () => {
+  it('puts the chosen direction after the brief', () => {
+    const sent = composeRound({ doc: doc({ direction: 'Lead with one story.' }), round: 3, receiver: 'a', briefBlocks: [] });
+    expect(sent).toContain('</brief>\n\nDirection I chose:\n<direction>\nLead with one story.\n</direction>\n\nDocument (round 3)');
+  });
+});
+
+describe('composeStrategy', () => {
+  const take = (over: Partial<Strategy> = {}): Strategy => ({
+    goal: 'Get a PM interview', verdict: 'rethink', assessment: 'Too long.', approach: 'One story.', ...over,
+  });
+
+  it('sends the brief, document and strategy task on a first take', () => {
+    expect(composeStrategy({ doc: doc(), round: 1, receiver: 'a', briefBlocks: [] })).toBe(
+      'Brief:\n<brief>\nLinkedIn bio for PM roles\n</brief>\n\n' +
+        'Document (round 1):\n<document>\nI have gone deep on LLMs.\n</document>\n\n' +
+        STRATEGY_TASK,
+    );
+  });
+
+  it('shares the previous strategy round, the receiver\'s own take marked as theirs', () => {
+    const previous: Round = {
+      n: 1, kind: 'strategy', sentAt: '', snapshot: '', participants: ['a', 'b', 'c'],
+      notes: {
+        a: { status: 'done', strategy: take() },
+        b: { status: 'done', strategy: take({ verdict: 'send', assessment: 'Fine as is.', approach: 'Send it.' }) },
+        c: { status: 'error' },
+      },
+    };
+    const sent = composeStrategy({ doc: doc(), round: 2, receiver: 'a', briefBlocks: [], previous });
+    expect(sent).toContain(
+      'Takes from the last strategy round:\n' +
+        '<take by="you" verdict="rethink">\nGoal: Get a PM interview\nAssessment: Too long.\nApproach: One story.\n</take>\n' +
+        '<take by="another reviewer" verdict="send">\nGoal: Get a PM interview\nAssessment: Fine as is.\nApproach: Send it.\n</take>',
+    );
+    expect(sent.endsWith(STRATEGY_TASK)).toBe(true);
+  });
+});
+
+describe('STRATEGY_TASK', () => {
+  it('asks for the big picture, allows not sending, forbids edits, and names the JSON shape', () => {
+    expect(STRATEGY_TASK).toMatch(/goal/i);
+    expect(STRATEGY_TASK).toContain('"dont_send"');
+    expect(STRATEGY_TASK).toMatch(/no line edits/i);
+    expect(STRATEGY_TASK).toContain('"approach"');
+  });
+});
+
+describe('composeDraft', () => {
+  it('sends the brief, the direction, the document and the draft task', () => {
+    expect(composeDraft({ doc: doc({ direction: 'One story.' }), briefBlocks: [] })).toBe(
+      'Brief:\n<brief>\nLinkedIn bio for PM roles\n</brief>\n\n' +
+        'Direction I chose:\n<direction>\nOne story.\n</direction>\n\n' +
+        'Current document:\n<document>\nI have gone deep on LLMs.\n</document>\n\n' +
+        DRAFT_TASK,
+    );
+  });
+
+  it('asks for the whole new document between tags', () => {
+    expect(DRAFT_TASK).toContain('<document>');
+    expect(DRAFT_TASK).toMatch(/placeholder/i);
   });
 });

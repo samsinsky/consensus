@@ -3,6 +3,8 @@ import Markdown from 'react-markdown';
 import type { Round } from '../../shared/types.js';
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+/** A draft round's snapshot is the text the redraft replaced. */
+const label = (r: Round) => `Round ${r.n}${r.kind === 'draft' ? ' · Before redraft' : r.kind === 'strategy' ? ' · Strategy' : ''} · ${time(r.sentAt)}`;
 
 export function HistoryMenu({ rounds, onRestore }: { rounds: Round[]; onRestore: (round: number) => Promise<void> }) {
   const [open, setOpen] = useState(false);
@@ -48,7 +50,7 @@ export function HistoryMenu({ rounds, onRestore }: { rounds: Round[]; onRestore:
         <div className="history-menu">
           {[...rounds].reverse().map((r) => (
             <button key={r.n} className="menu-item" onClick={() => { setViewing(r); setOpen(false); }}>
-              Round {r.n} · {time(r.sentAt)}
+              {label(r)}
             </button>
           ))}
         </div>
@@ -56,7 +58,7 @@ export function HistoryMenu({ rounds, onRestore }: { rounds: Round[]; onRestore:
       {viewing && (
         <div className="dialog-backdrop" onClick={() => setViewing(undefined)}>
           <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <header><h2>Round {viewing.n} · {time(viewing.sentAt)}</h2><button className="ghost" onClick={() => setViewing(undefined)}>Close</button></header>
+            <header><h2>{label(viewing)}</h2><button className="ghost" onClick={() => setViewing(undefined)}>Close</button></header>
             <div className="snapshot"><Markdown>{viewing.snapshot}</Markdown></div>
             <div className="card-actions"><button onClick={() => restore(viewing.n)}>Restore</button></div>
             {error && <p className="error-inline">{error}</p>}

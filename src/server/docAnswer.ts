@@ -1,4 +1,4 @@
-import type { Stance } from '../shared/types.js';
+import type { Stance, Strategy, Verdict } from '../shared/types.js';
 
 export type ParsedAnswer = {
   proposals: { quote: string; replacement: string; reason: string }[];
@@ -7,20 +7,54 @@ export type ParsedAnswer = {
 };
 
 /** On failure, reason completes "Your answer …". */
-export type ParseResult = { ok: true; value: ParsedAnswer } | { ok: false; reason: string };
+export type Parsed<T> = { ok: true; value: T } | { ok: false; reason: string };
+export type ParseResult = Parsed<ParsedAnswer>;
 
 const STANCES: Stance[] = ['agree', 'disagree', 'your_call'];
 
 export function parseAnswer(text: string, knownIds: Set<string>): ParseResult {
+  const data = readJson(text);
+  return data.ok ? validate(data.value, knownIds) : data;
+}
+
+const VERDICTS: Verdict[] = ['send', 'revise', 'rethink', 'dont_send'];
+const STRATEGY_FIELDS = ['goal', 'assessment', 'approach'] as const;
+
+export function parseStrategy(text: string): Parsed<Strategy> {
+  const data = readJson(text);
+  if (!data.ok) return data;
+  const o = data.value;
+  if (!isObject(o)) return { ok: false, reason: 'had a JSON block that is not an object' };
+  for (const field of STRATEGY_FIELDS) {
+    if (typeof o[field] !== 'string' || !o[field].trim()) return { ok: false, reason: `had no "${field}" text` };
+  }
+  if (!VERDICTS.includes(o.verdict as Verdict)) {
+    return { ok: false, reason: 'had a "verdict" other than "send", "revise", "rethink" or "dont_send"' };
+  }
+  return { ok: true, value: { goal: o.goal as string, verdict: o.verdict as Verdict, assessment: o.assessment as string, approach: o.approach as string } };
+}
+
+const OPEN = '<document>';
+const CLOSE = '</document>';
+
+/** A redraft: the last <document> block is the new text, and everything around it is the explanation. */
+export function parseDraft(text: string): Parsed<{ markdown: string; note: string }> {
+  const end = text.lastIndexOf(CLOSE);
+  const start = end < 0 ? -1 : text.lastIndexOf(OPEN, end);
+  if (start < 0) return { ok: false, reason: 'was missing the <document> tags' };
+  const markdown = text.slice(start + OPEN.length, end).trim();
+  if (!markdown) return { ok: false, reason: 'had an empty document' };
+  return { ok: true, value: { markdown, note: (text.slice(0, start) + text.slice(end + CLOSE.length)).trim() } };
+}
+
+function readJson(text: string): Parsed<unknown> {
   const raw = lastJson(text);
   if (raw === undefined) return { ok: false, reason: 'was missing the JSON block' };
-  let data: unknown;
   try {
-    data = JSON.parse(raw);
+    return { ok: true, value: JSON.parse(raw) };
   } catch (e) {
     return { ok: false, reason: `had a JSON block that failed: ${(e as Error).message}` };
   }
-  return validate(data, knownIds);
 }
 
 function lastJson(text: string): string | undefined {
