@@ -212,27 +212,11 @@ body.resizing { cursor: col-resize; user-select: none; }
 .card .author { display: inline-flex; align-items: center; gap: 6px; }
 .note.note-line, .card.stale.stale-line { flex-direction: row; align-items: center; gap: 8px; width: 100%; text-align: left; cursor: pointer; padding: 6px 10px; overflow: hidden; white-space: nowrap; font: inherit; font-size: 13px; color: inherit; }
 .note.note-line { flex-direction: column; align-items: stretch; gap: 2px; }
-.note-model { color: var(--muted); font-size: 11px; font-weight: normal; margin-left: 6px; white-space: nowrap; }
+.note-model { color: var(--muted); font-size: 11px; font-weight: normal; margin-left: 6px; }
 .note.note-line .author { overflow: hidden; text-overflow: ellipsis; }
 .note.note-line .note-summary { padding-left: 16px; }
 .note.note-line .author, .card.stale.stale-line .author { flex: none; }
 .note .note-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .card.stale.stale-line .tag { flex: none; }
 .note .author, .card.stale .author { cursor: pointer; }
-.tag.verdict { margin-left: 6px; font-weight: normal; }
-.tag.verdict.send { border-color: var(--codex); color: var(--codex); }
-.tag.verdict.rethink { border-color: var(--claude); color: var(--claude); }
-.tag.verdict.dont_send { border-color: var(--error); color: var(--error); }
-.take { margin: 0; display: grid; gap: 2px; }
-.take dt { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
-.take dd { margin: 0; }
-.draft-note > :first-child { margin-top: 0; } .draft-note > :last-child { margin-bottom: 0; }
-.strategy-panel .strategy-hint { margin: 0; }
-.strategy-panel .own-direction { align-self: flex-start; padding-left: 0; }
-.direction-input { width: 100%; box-sizing: border-box; resize: none; font-size: 13px; line-height: 1.45; max-height: 40vh; }
-.direction-actions { flex-wrap: wrap; align-items: center; }
-.direction-actions label { color: var(--muted); }
-.direction-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
-.direction-text { margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.direction-bar button { flex: none; padding: 2px 6px; }
 .review-summary .note-model { margin-left: 2px; font-size: 12px; }

@@ -13,8 +13,6 @@ vi.mock('../../src/web/api.js', () => ({
     replyToProposal: vi.fn().mockResolvedValue(undefined),
     retryReview: vi.fn().mockResolvedValue(undefined),
     restore: vi.fn().mockResolvedValue(undefined),
-    setPhase: vi.fn().mockResolvedValue(undefined),
-    startDraft: vi.fn().mockResolvedValue({ round: 2 }),
     renameThread: vi.fn(), setIncluded: vi.fn(), removeParticipant: vi.fn(), addParticipant: vi.fn(), uploadAttachment: vi.fn(),
     attachmentUrl: () => '',
   },
@@ -226,56 +224,5 @@ describe('DocView', () => {
     expect(arrow().getAttribute('aria-label')).toBe('Stop');
     await act(async () => click(arrow()));
     expect(api.stopRound).toHaveBeenCalledWith('t');
-  });
-
-  describe('strategy', () => {
-    const strategyThread = (): Thread => {
-      const t = thread();
-      t.doc!.phase = 'strategy';
-      t.doc!.proposals = [];
-      t.doc!.rounds = [{
-        n: 1, kind: 'strategy', sentAt: '2026-10-13T12:00:00Z', snapshot: 'I have gone deep on LLMs.', participants: ['a', 'b'],
-        notes: {
-          a: { status: 'done', note: 'Reads like a list.', strategy: { goal: 'Land a PM interview', verdict: 'rethink', assessment: 'Reads like a list.', approach: 'Lead with one story.' } },
-          b: { status: 'done', note: 'Fine.', strategy: { goal: 'Land a PM interview', verdict: 'dont_send', assessment: 'Fine.', approach: 'Ask for an intro instead.' } },
-        },
-      }];
-      return t;
-    };
-
-    it('tags each reviewer with a verdict, and "Go with this" prefills a direction the chosen reviewer drafts', async () => {
-      act(() => root.render(<DocView thread={strategyThread()} activity={{}} models={models} defaults={defaults} />));
-      expect([...host.querySelectorAll('.tag.verdict')].map((t) => t.textContent)).toEqual(['Rethink', "Don't send"]);
-      click(host.querySelectorAll('.note-line')[1]);
-      expect(host.textContent).toContain('Ask for an intro instead.');
-      click(button('Go with this'));
-      const box = host.querySelector('.direction-input') as HTMLTextAreaElement;
-      expect(box.value).toBe('Ask for an intro instead.');
-      expect((host.querySelector('.direction-actions select') as HTMLSelectElement).value).toBe('b');
-      await act(async () => click(button('Draft it')));
-      expect(api.startDraft).toHaveBeenCalledWith('t', 'b', 'Ask for an intro instead.');
-    });
-
-    it('skips to edits, and the editing phase offers the way back with the direction shown', async () => {
-      act(() => root.render(<DocView thread={strategyThread()} activity={{}} models={models} defaults={defaults} />));
-      await act(async () => click(button('Skip to edits')));
-      expect(api.setPhase).toHaveBeenCalledWith('t', 'editing');
-      const editing = thread();
-      editing.doc!.direction = 'Lead with one story.';
-      act(() => root.render(<DocView thread={editing} activity={{}} models={models} defaults={defaults} />));
-      expect(host.querySelector('.strategy-panel')).toBeNull();
-      expect(host.querySelector('.direction-text')?.textContent).toBe('Direction: Lead with one story.');
-      await act(async () => click(button('Back to strategy')));
-      expect(api.setPhase).toHaveBeenCalledWith('t', 'strategy');
-    });
-
-    it('locks the document while a reviewer drafts', async () => {
-      const t = strategyThread();
-      t.doc!.rounds.push({ n: 2, kind: 'draft', sentAt: '', snapshot: '', participants: ['a'], notes: { a: { status: 'running' } } });
-      await act(async () => root.render(<DocView thread={t} activity={{}} models={models} defaults={defaults} />));
-      expect(host.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false');
-      expect(host.textContent).toContain('Drafting…');
-      expect(api.saveDoc).not.toHaveBeenCalled();
-    });
   });
 });

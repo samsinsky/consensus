@@ -18,7 +18,6 @@ import { ProposalCard, StaleCard } from './ProposalCard.js';
 import { ProposalHighlights, showProposals } from './proposalDecorations.js';
 import { ResolvedList } from './ResolvedList.js';
 import { ReviewBar } from './ReviewBar.js';
-import { DirectionBar, StrategyPanel, type Choice } from './StrategyPanel.js';
 import { useAutoGrow } from '../useAutoGrow.js';
 
 const SAVE_DELAY = 1000;
@@ -43,7 +42,6 @@ export function DocView({ thread, activity, models, defaults }: Props) {
   const [error, setError] = useState<string>();
   const [copied, setCopied] = useState(false);
   const [brief, setBrief] = useState(doc.brief);
-  const [choice, setChoice] = useState<Choice>();
   const briefBox = useRef<HTMLTextAreaElement>(null);
   const docPane = useRef<HTMLDivElement>(null);
   useAutoGrow(briefBox, brief);
@@ -161,24 +159,6 @@ export function DocView({ thread, activity, models, defaults }: Props) {
 
   const latest = doc.rounds.at(-1);
   const running = !!latest && Object.values(latest.notes).some((n) => n.status === 'running');
-  const strategy = doc.phase === 'strategy';
-  const drafting = running && latest?.kind === 'draft';
-
-  // A redraft replaces the whole text when it lands: don't let edits made meanwhile be lost.
-  useEffect(() => {
-    // No update event: it would queue the unchanged text as an edit.
-    if (editor && editor.isEditable === drafting) editor.setEditable(!drafting, false);
-  }, [editor, drafting]);
-
-  // Leaving strategy settles the choice.
-  useEffect(() => {
-    if (!strategy) setChoice(undefined);
-  }, [strategy]);
-
-  const draft = () => attempt(async () => {
-    if (!choice || !(await flush())) return;
-    await api.startDraft(thread.id, choice.drafter, choice.direction);
-  });
 
   const send = () => attempt(async () => {
     if (!(await flush())) return;
@@ -220,23 +200,8 @@ export function DocView({ thread, activity, models, defaults }: Props) {
   };
 
   const reviewers = thread.participants.filter((p) => doc.rounds.some((r) => r.participants.includes(p.id)));
-  const latestStrategy = [...doc.rounds].reverse().find((r) => r.kind === 'strategy');
   const header = (
     <>
-      {strategy ? (
-        <StrategyPanel
-          participants={thread.participants}
-          hasTakes={!!latestStrategy && Object.values(latestStrategy.notes).some((n) => n.strategy)}
-          running={running}
-          choice={choice}
-          defaultDrafter={doc.included[0] ?? thread.participants[0]?.id}
-          onChange={setChoice}
-          onDraft={draft}
-          onSkip={() => attempt(() => api.setPhase(thread.id, 'editing'))}
-        />
-      ) : (
-        <DirectionBar direction={doc.direction} running={running} onBack={() => attempt(() => api.setPhase(thread.id, 'strategy'))} />
-      )}
       {reviewers.map((p) => (
         <NoteCard
           key={p.id}
@@ -247,7 +212,6 @@ export function DocView({ thread, activity, models, defaults }: Props) {
           roundRunning={running}
           latestRound={latest?.n ?? 0}
           onRetry={() => attempt(() => api.retryReview(thread.id, p.id))}
-          onChoose={strategy ? (approach) => setChoice({ direction: approach, drafter: p.id }) : undefined}
         />
       ))}
       {layout.stale.map((p) => (
@@ -351,9 +315,7 @@ export function DocView({ thread, activity, models, defaults }: Props) {
             ref={briefBox}
             className="brief-input"
             rows={1}
-            placeholder={strategy
-              ? 'Brief for reviewers: what this is for, who reads it, any limits. Cmd+Enter asks for their take.'
-              : 'Brief for reviewers: what this is, who reads it, any limits. Cmd+Enter to send.'}
+            placeholder="Brief for reviewers: what this is, who reads it, any limits. Cmd+Enter to send."
             value={brief}
             onChange={(e) => {
               setBrief(e.target.value);
@@ -371,7 +333,7 @@ export function DocView({ thread, activity, models, defaults }: Props) {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
             </button>
           ) : (
-            <button className="send-btn" disabled={!doc.included.length} onClick={send} title={strategy ? 'Ask for their take (Cmd+Enter)' : 'Send for review (Cmd+Enter)'} aria-label="Send">
+            <button className="send-btn" disabled={!doc.included.length} onClick={send} title="Send for review (Cmd+Enter)" aria-label="Send">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 19V5" />
                 <path d="m5 12 7-7 7 7" />
