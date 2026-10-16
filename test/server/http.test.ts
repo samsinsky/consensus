@@ -223,6 +223,8 @@ describe('doc routes', () => {
     expect(thread!.doc!.proposals[0]).toMatchObject({ id: 'P1', quote: 'gone deep on' });
 
     expect((await api('POST', `/api/threads/${id}/proposals/P1/replies`, { text: 'Hm.' })).status).toBe(204);
+    expect((await api('PATCH', `/api/threads/${id}/proposals/P1`, { rebased: [{ id: 'P2', quote: 7 }] })).status).toBe(400);
+    expect((await api('PATCH', `/api/threads/${id}/proposals/P1`, { superseded: 'P2' })).status).toBe(400);
     expect((await api('PATCH', `/api/threads/${id}/proposals/P1`, { status: 'accepted', replacement: 'studied hard' })).status).toBe(204);
     expect((await api('PATCH', `/api/threads/${id}/proposals/P1`, { status: 'maybe' })).status).toBe(400);
     expect((await api('POST', `/api/threads/${id}/restore`, { round: 1 })).status).toBe(204);

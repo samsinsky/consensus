@@ -1,6 +1,8 @@
 import type { Editor } from '@tiptap/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { checkFile } from '../../shared/attachmentRules.js';
+import type { TextIndex } from '../../shared/anchor.js';
+import { changedSpan, settle } from '../../shared/change.js';
 import { RESOLVED } from '../../shared/proposals.js';
 import type { ModelOption, ProviderDefaults, ProviderId, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
@@ -21,6 +23,14 @@ import { ReviewBar } from './ReviewBar.js';
 import { useAutoGrow } from '../useAutoGrow.js';
 
 const SAVE_DELAY = 1000;
+
+/** Editor positions for a span of the plain-text index. An insertion goes right after the word before it. */
+function editorRange(index: TextIndex, span: { start: number; end: number }): { from: number; to: number } {
+  const { map } = index;
+  if (span.end > span.start) return { from: map[span.start], to: map[span.end - 1] + 1 };
+  const at = span.start > 0 ? map[span.start - 1] + 1 : (map[0] ?? 0);
+  return { from: at, to: at };
+}
 const highlights = [ProposalHighlights];
 
 type Props = {
@@ -141,11 +151,18 @@ export function DocView({ thread, activity, models, defaults }: Props) {
   const accept = (g: Group, id: string, replacement: string) => attempt(async () => {
     const o = g.options.find((x) => x.proposal.id === id);
     if (!editor || !o) return;
-    applyReplacement(editor, o, replacement);
+    const before = editorIndex(editor.state.doc);
+    // Replace only the words that change, so formatting and text around them stay as they are.
+    const change = changedSpan(o, replacement);
+    applyReplacement(editor, editorRange(before, change), change.insert);
+    const others = layout.groups.filter((x) => x !== g).flatMap((x) => x.options);
+    const { rebased, superseded } = settle(others, change, before, editorIndex(editor.state.doc));
     await api.updateProposal(thread.id, id, {
       status: 'accepted',
       replacement: replacement !== o.proposal.replacement ? replacement : undefined,
       notChosen: g.options.filter((x) => x.proposal.id !== id).map((x) => x.proposal.id),
+      superseded: superseded.length ? superseded : undefined,
+      rebased: rebased.length ? rebased : undefined,
     });
   });
 

@@ -25,6 +25,14 @@ describe('groupOverlaps', () => {
     ])).toEqual([['P1', 'P3'], ['P2']]);
   });
 
+  it('groups two insertions at the same spot', () => {
+    expect(groupOverlaps([
+      { id: 'P1', start: 5, end: 5 },
+      { id: 'P2', start: 5, end: 5 },
+      { id: 'P3', start: 9, end: 9 },
+    ])).toEqual([['P1', 'P2'], ['P3']]);
+  });
+
   it('keeps ranges that only clip each other apart', () => {
     expect(groupOverlaps([
       { id: 'P1', start: 0, end: 10 },

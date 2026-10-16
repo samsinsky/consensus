@@ -97,7 +97,8 @@ export type ThreadKind = 'chat' | 'doc';
 
 export type Stance = 'agree' | 'disagree' | 'your_call';
 
-export type ProposalStatus = 'open' | 'accepted' | 'rejected' | 'not_chosen' | 'dismissed';
+/** superseded: an accepted change rewrote the words it quoted. */
+export type ProposalStatus = 'open' | 'accepted' | 'rejected' | 'not_chosen' | 'dismissed' | 'superseded';
 
 export type ProposalReply = {
   /** 'user' for Sam, else a participant id. */

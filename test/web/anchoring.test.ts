@@ -32,6 +32,19 @@ describe('placeProposals', () => {
   });
 });
 
+describe('placeProposals by changed words', () => {
+  it('groups by the words each suggestion changes, not by how much it quotes', () => {
+    const ed = make('I think that birds can fly.');
+    const { groups } = placeProposals([
+      prop({ id: 'P1', quote: 'I think that', replacement: 'We think that' }),
+      prop({ id: 'P2', quote: 'think that birds', replacement: 'think that penguins' }),
+      prop({ id: 'P3', quote: 'that birds can', replacement: 'that penguins can' }),
+    ], editorIndex(ed.state.doc));
+    expect(groups.map((g) => g.options.map((o) => o.proposal.id))).toEqual([['P1'], ['P2', 'P3']]);
+    expect(groups[0].options[0]).toMatchObject({ start: 0, end: 12 });
+  });
+});
+
 describe('shownOption', () => {
   it('shows the picked option, else the first', () => {
     const ed = make('I have gone deep on LLMs.');

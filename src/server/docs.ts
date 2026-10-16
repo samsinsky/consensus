@@ -1,5 +1,6 @@
 import { cleanQuote, contextAt, findAll, indexString, normalize } from '../shared/anchor.js';
 import { markdownToPlain } from '../shared/markdownText.js';
+import type { Rebased } from '../shared/change.js';
 import type { DocState, Participant, Round, RoundNote, Thread } from '../shared/types.js';
 import type { ImageInput } from './adapters/types.js';
 import { parseAnswer, type ParsedAnswer } from './docAnswer.js';
@@ -113,7 +114,15 @@ export class DocService {
   async updateProposal(
     threadId: string,
     proposalId: string,
-    input: { status?: 'accepted' | 'rejected' | 'dismissed'; replacement?: string; notChosen?: string[] },
+    input: {
+      status?: 'accepted' | 'rejected' | 'dismissed';
+      replacement?: string;
+      notChosen?: string[];
+      /** Open suggestions the accepted change rewrote. */
+      superseded?: string[];
+      /** Open suggestions whose quote the change touched but whose own change still applies, moved onto the new text. */
+      rebased?: Rebased[];
+    },
   ): Promise<void> {
     const thread = await this.mustDoc(threadId);
     const p = thread.doc.proposals.find((x) => x.id === proposalId);
@@ -125,12 +134,20 @@ export class DocService {
       p.status = input.status;
       p.resolvedAt = now;
     }
-    for (const id of input.notChosen ?? []) {
-      const other = thread.doc.proposals.find((x) => x.id === id);
-      if (other?.status === 'open') {
-        other.status = 'not_chosen';
-        other.resolvedAt = now;
+    const others = (ids: string[] | undefined, status: 'not_chosen' | 'superseded') => {
+      for (const id of ids ?? []) {
+        const other = thread.doc.proposals.find((x) => x.id === id);
+        if (other?.status === 'open') {
+          other.status = status;
+          other.resolvedAt = now;
+        }
       }
+    };
+    others(input.notChosen, 'not_chosen');
+    others(input.superseded, 'superseded');
+    for (const r of input.rebased ?? []) {
+      const other = thread.doc.proposals.find((x) => x.id === r.id);
+      if (other?.status === 'open') Object.assign(other, { quote: r.quote, replacement: r.replacement, prefix: r.prefix, suffix: r.suffix });
     }
     await this.router.save(thread);
   }

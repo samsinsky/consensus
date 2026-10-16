@@ -1,11 +1,13 @@
 import { locate, toSource, type TextIndex } from '../../shared/anchor.js';
+import { changedSpan } from '../../shared/change.js';
 import { groupOverlaps, isYourCall } from '../../shared/proposals.js';
 import type { Proposal } from '../../shared/types.js';
 
-export type Placed = { proposal: Proposal; from: number; to: number };
+/** from/to are editor positions; start/end are the quote's range in the plain-text index. */
+export type Placed = { proposal: Proposal; from: number; to: number; start: number; end: number };
 export type Group = { key: string; options: Placed[]; yourCall: boolean };
 
-/** Anchors open proposals against the live text. Overlapping ones form groups; ones whose text is gone are out of date. */
+/** Anchors open proposals against the live text. Ones changing mostly the same words form groups; ones whose text is gone are out of date. */
 export function placeProposals(proposals: Proposal[], index: TextIndex): { groups: Group[]; stale: Proposal[] } {
   const placed = new Map<string, Placed>();
   const ranges: { id: string; start: number; end: number }[] = [];
@@ -17,8 +19,10 @@ export function placeProposals(proposals: Proposal[], index: TextIndex): { group
       stale.push(p);
       continue;
     }
-    placed.set(p.id, { proposal: p, ...toSource(index, at) });
-    ranges.push({ id: p.id, ...at });
+    placed.set(p.id, { proposal: p, ...toSource(index, at), ...at });
+    // Models quote more than they change: compare the words each one actually changes.
+    const { start, end } = changedSpan({ proposal: p, ...at });
+    ranges.push({ id: p.id, start, end });
   }
   const groups = groupOverlaps(ranges).map((ids) => {
     const options = ids.map((id) => placed.get(id)!);

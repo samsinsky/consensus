@@ -1,4 +1,5 @@
 import type { Attachment, ModelOption, Participant, ProviderId, Quote, Settings, Thread, ThreadKind, ThreadSummary } from '../shared/types.js';
+import type { Rebased } from '../shared/change.js';
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -30,7 +31,11 @@ export const api = {
   startRound: (threadId: string) => call<{ round: number }>('POST', `/api/threads/${threadId}/rounds`),
   stopRound: (threadId: string) => call<void>('POST', `/api/threads/${threadId}/rounds/stop`),
   retryReview: (threadId: string, participantId: string) => call<void>('POST', `/api/threads/${threadId}/participants/${participantId}/retry-review`),
-  updateProposal: (threadId: string, proposalId: string, body: { status?: 'accepted' | 'rejected' | 'dismissed'; replacement?: string; notChosen?: string[] }) =>
+  updateProposal: (
+    threadId: string,
+    proposalId: string,
+    body: { status?: 'accepted' | 'rejected' | 'dismissed'; replacement?: string; notChosen?: string[]; superseded?: string[]; rebased?: Rebased[] },
+  ) =>
     call<void>('PATCH', `/api/threads/${threadId}/proposals/${proposalId}`, body),
   replyToProposal: (threadId: string, proposalId: string, text: string) =>
     call<void>('POST', `/api/threads/${threadId}/proposals/${proposalId}/replies`, { text }),

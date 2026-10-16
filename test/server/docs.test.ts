@@ -84,6 +84,25 @@ describe('DocService basics', () => {
     await expect(docs.updateProposal(t.id, 'P9', { status: 'rejected' })).rejects.toMatchObject({ code: 'not_found' });
   });
 
+  it('on accept, supersedes suggestions the change replaced and moves the rest onto the new text', async () => {
+    const { t, a, b } = await docWithTwo();
+    const base = { round: 1, prefix: '', suffix: '', reason: 'r', status: 'open' as const, replies: [] };
+    t.doc!.proposals.push(
+      { ...base, id: 'P1', authors: [a.id], quote: 'I think', replacement: 'We think' },
+      { ...base, id: 'P2', authors: [b.id], quote: 'I think that birds can fly', replacement: 'Birds fly' },
+      { ...base, id: 'P3', authors: [b.id], quote: 'I think that birds', replacement: 'I think that penguins' },
+    );
+    await docs.updateProposal(t.id, 'P1', {
+      status: 'accepted',
+      superseded: ['P2'],
+      rebased: [{ id: 'P3', quote: 'We think that birds', replacement: 'We think that penguins', prefix: '', suffix: ' can fly' }],
+    });
+    const [, p2, p3] = (await router.getThread(t.id))!.doc!.proposals;
+    expect(p2).toMatchObject({ status: 'superseded' });
+    expect(p2.resolvedAt).toBeTruthy();
+    expect(p3).toMatchObject({ status: 'open', quote: 'We think that birds', replacement: 'We think that penguins', suffix: ' can fly' });
+  });
+
   it('keeps an edited replacement on an open proposal', async () => {
     const { t, a } = await docWithTwo();
     t.doc!.proposals.push({ id: 'P1', round: 1, authors: [a.id], quote: 'q', prefix: '', suffix: '', replacement: 'r', reason: 'x', status: 'open', replies: [] });

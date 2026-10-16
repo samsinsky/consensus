@@ -1,12 +1,14 @@
 import type { Proposal, ProposalStatus, Stance } from './types.js';
 
-export const RESOLVED: ProposalStatus[] = ['accepted', 'rejected', 'not_chosen', 'dismissed'];
+export const RESOLVED: ProposalStatus[] = ['accepted', 'rejected', 'not_chosen', 'dismissed', 'superseded'];
 
 /** Ids of ranges that rewrite mostly the same text, grouped as versions in text order. Ranges that only clip or touch stay apart. */
 export function groupOverlaps(ranges: { id: string; start: number; end: number }[]): string[][] {
   const sorted = [...ranges].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id, undefined, { numeric: true }));
   // Versions rewrite mostly the same text. A comma fix inside a paragraph rewrite is its own suggestion.
   const versions = (a: (typeof sorted)[number], b: (typeof sorted)[number]) => {
+    // Two insertions at the same spot are versions too.
+    if (a.start === a.end && b.start === b.end) return a.start === b.start;
     const shared = Math.min(a.end, b.end) - Math.max(a.start, b.start);
     return shared > 0 && shared * 2 >= Math.max(a.end - a.start, b.end - b.start);
   };

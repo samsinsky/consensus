@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Participant, Proposal } from '../../shared/types.js';
 import { authorLabel } from './ProposalCard.js';
 
-const STATUS = { accepted: 'Accepted', rejected: 'Rejected', not_chosen: 'Not chosen', dismissed: 'Dismissed', open: 'Open' } as const;
+const STATUS = { accepted: 'Accepted', rejected: 'Rejected', not_chosen: 'Not chosen', dismissed: 'Dismissed', superseded: 'Superseded', open: 'Open' } as const;
 
 export function ResolvedList({ proposals, participants }: { proposals: Proposal[]; participants: Participant[] }) {
   const [open, setOpen] = useState(false);

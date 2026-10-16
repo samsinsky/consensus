@@ -31,7 +31,7 @@ const thread = (): Thread => ({
     rounds: [{ n: 1, sentAt: '2026-10-13T12:00:00Z', snapshot: 'I have gone deep on LLMs.', participants: ['a', 'b'], notes: { a: { status: 'done', note: 'Tight.' }, b: { status: 'done', note: 'Close.' } } }],
     proposals: [
       { id: 'P1', round: 1, authors: ['a'], quote: 'gone deep on', prefix: 'I have ', suffix: ' LLMs.', replacement: 'gained', reason: 'Fits.', status: 'open', replies: [] },
-      { id: 'P2', round: 1, authors: ['b'], quote: 'deep on', prefix: 'I have gone ', suffix: ' LLMs.', replacement: 'focused on', reason: 'Plainer.', status: 'open', replies: [] },
+      { id: 'P2', round: 1, authors: ['b'], quote: 'gone deep on', prefix: 'I have ', suffix: ' LLMs.', replacement: 'focused on', reason: 'Plainer.', status: 'open', replies: [] },
     ],
   },
 });
@@ -70,6 +70,29 @@ describe('DocView', () => {
     await act(async () => click(button('Accept A')));
     expect(host.querySelector('.ProseMirror')!.textContent).toBe('I have gained LLMs.');
     expect(api.updateProposal).toHaveBeenCalledWith('t', 'P1', { status: 'accepted', replacement: undefined, notChosen: ['P2'] });
+  });
+
+  it('accepting edits only the changed words, supersedes what it rewrote, and keeps compatible overlapping suggestions live', async () => {
+    const t = thread();
+    const base = { round: 1, authors: ['b'], prefix: '', suffix: '', reason: 'r', status: 'open' as const, replies: [] };
+    t.doc!.markdown = 'I think that **birds** can fly.';
+    t.doc!.proposals = [
+      { ...base, id: 'P1', authors: ['a'], quote: 'I think', replacement: 'We think' },
+      { ...base, id: 'P2', quote: 'I think that birds can fly.', replacement: 'Birds fly.' },
+      { ...base, id: 'P3', quote: 'I think that birds', replacement: 'I think that penguins' },
+    ];
+    await act(async () => root.render(<DocView thread={t} activity={{}} models={models} defaults={defaults} />));
+    const card = host.querySelector('[data-card="P1"]')!;
+    await act(async () => click([...card.querySelectorAll('button')].find((b) => b.textContent === 'Accept')!));
+    // The bold on "birds" survives: only "I" was replaced.
+    expect(host.querySelector('.ProseMirror strong')?.textContent).toBe('birds');
+    expect(host.querySelector('.ProseMirror')!.textContent).toBe('We think that birds can fly.');
+    expect(api.updateProposal).toHaveBeenCalledWith('t', 'P1', {
+      status: 'accepted',
+      notChosen: [],
+      superseded: ['P2'],
+      rebased: [{ id: 'P3', quote: 'We think that birds', replacement: 'We think that penguins', prefix: '', suffix: ' can fly.' }],
+    });
   });
 
   it('saves pending edits before sending a round', async () => {

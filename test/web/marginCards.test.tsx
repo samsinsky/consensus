@@ -15,7 +15,7 @@ const people: Participant[] = [
 const prop = (over: Partial<Proposal>): Proposal => ({
   id: 'P1', round: 1, authors: ['a'], quote: 'gone deep on', prefix: '', suffix: '', replacement: 'gained', reason: 'Fits "Through".', status: 'open', replies: [], ...over,
 });
-const group = (...ps: Proposal[]): Group => ({ key: ps[0].id, options: ps.map((p) => ({ proposal: p, from: 1, to: 5 })), yourCall: ps.some((p) => p.replies.some((r) => r.stance === 'your_call')) });
+const group = (...ps: Proposal[]): Group => ({ key: ps[0].id, options: ps.map((p) => ({ proposal: p, from: 1, to: 5, start: 0, end: 4 })), yourCall: ps.some((p) => p.replies.some((r) => r.stance === 'your_call')) });
 
 let host: HTMLDivElement;
 let root: Root;

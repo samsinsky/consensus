@@ -4,6 +4,7 @@ import { extname, join, normalize, sep } from 'node:path';
 import { PROVIDER_IDS, type ProviderId, type Settings, type ThreadEvent } from '../shared/types.js';
 import type { ProviderAdapter } from './adapters/types.js';
 import { ATTACHMENT_LIMITS, AttachmentError, type AttachmentStore } from './attachments.js';
+import type { Rebased } from '../shared/change.js';
 import { DocService } from './docs.js';
 import type { EventHub } from './hub.js';
 import type { Paths } from './paths.js';
@@ -160,8 +161,16 @@ export function createConsensusServer(deps: Deps): Server {
     ['PATCH', re(`/api/threads/${ID}/proposals/${ID}`), async (req, res, [id, pid]) => {
       const body = await readJson(req);
       if (body.status !== undefined && !['accepted', 'rejected', 'dismissed'].includes(body.status)) throw new RouterError('invalid', 'Unknown status.');
-      const notChosen = Array.isArray(body.notChosen) ? body.notChosen.filter((x: unknown) => typeof x === 'string') : undefined;
-      await docs.updateProposal(id, pid, { status: body.status, replacement: optText(body.replacement), notChosen });
+      const ids = (v: unknown) => {
+        if (v === undefined) return undefined;
+        if (!Array.isArray(v) || !v.every((x) => typeof x === 'string')) throw new RouterError('invalid', 'Expected a list of proposal ids.');
+        return v as string[];
+      };
+      const rebased = body.rebased === undefined ? undefined : body.rebased;
+      if (rebased !== undefined && (!Array.isArray(rebased) || !rebased.every((r: unknown) => isRebased(r)))) {
+        throw new RouterError('invalid', 'Each moved proposal needs an id, quote, replacement, prefix and suffix.');
+      }
+      await docs.updateProposal(id, pid, { status: body.status, replacement: optText(body.replacement), notChosen: ids(body.notChosen), superseded: ids(body.superseded), rebased });
       res.writeHead(204).end();
     }],
     ['POST', re(`/api/threads/${ID}/proposals/${ID}/replies`), async (req, res, [id, pid]) => {
@@ -306,4 +315,10 @@ async function serveStatic(webDir: string | undefined, req: IncomingMessage, res
     }
   }
   json(res, 404, { error: 'Not found.' });
+}
+
+function isRebased(r: unknown): r is Rebased {
+  if (typeof r !== 'object' || r === null) return false;
+  const o = r as Record<string, unknown>;
+  return ['id', 'quote', 'replacement', 'prefix', 'suffix'].every((k) => typeof o[k] === 'string');
 }
