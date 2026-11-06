@@ -4,6 +4,7 @@ import { stanceVoters } from '../../shared/proposals.js';
 import type { Participant, Proposal, ProposalReply } from '../../shared/types.js';
 import { useAutoGrow } from '../useAutoGrow.js';
 import type { Group } from './anchoring.js';
+import { RefText } from './proposalRefs.js';
 
 const LETTERS = 'ABCDEFGHIJ';
 const STANCE = { agree: 'agree', disagree: 'disagree', your_call: 'your call' } as const;
@@ -141,7 +142,7 @@ function Replies({ replies, participants }: { replies: ProposalReply[]; particip
       {replies.map((r, i) => (
         <li key={i}>
           {r.from === 'user' ? 'You' : authorLabel([r.from], participants)}
-          {r.stance ? ` (${STANCE[r.stance]})` : ''}: {r.text}
+          {r.stance ? ` (${STANCE[r.stance]})` : ''}: <RefText text={r.text} />
         </li>
       ))}
     </ul>

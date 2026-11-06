@@ -18,6 +18,7 @@ import { Margin } from './Margin.js';
 import { NoteCard } from './NoteCard.js';
 import { ProposalCard, StaleCard } from './ProposalCard.js';
 import { ProposalHighlights, showProposals } from './proposalDecorations.js';
+import { ProposalRefs } from './proposalRefs.js';
 import { ResolvedList } from './ResolvedList.js';
 import { ReviewBar } from './ReviewBar.js';
 import { useAutoGrow } from '../useAutoGrow.js';
@@ -174,6 +175,14 @@ export function DocView({ thread, activity, models, defaults }: Props) {
       return next;
     });
 
+  // A reviewer's "P4" in a note or reply: show that version on its card and focus it.
+  const jumpTo = (id: string) => {
+    const g = layout.groups.find((x) => x.options.some((o) => o.proposal.id === id));
+    if (g) pick(g, id);
+    setFocused(id);
+  };
+  const refs = useMemo(() => ({ proposals: doc.proposals, onJump: jumpTo }), [doc.proposals, layout]);
+
   const latest = doc.rounds.at(-1);
   const running = !!latest && Object.values(latest.notes).some((n) => n.status === 'running');
 
@@ -261,6 +270,7 @@ export function DocView({ thread, activity, models, defaults }: Props) {
   });
 
   return (
+    <ProposalRefs.Provider value={refs}>
     <section className="thread-view doc-view">
       <header className="thread-head">
         <ThreadTitle thread={thread} />
@@ -360,5 +370,6 @@ export function DocView({ thread, activity, models, defaults }: Props) {
         </div>
       </div>
     </section>
+    </ProposalRefs.Provider>
   );
 }

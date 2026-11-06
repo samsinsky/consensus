@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import Markdown from 'react-markdown';
 import { modelLabel, participantName } from '../../shared/labels.js';
-import type { Participant, Round, Verdict } from '../../shared/types.js';
+import type { Participant, Proposal, Round, Verdict } from '../../shared/types.js';
+import { linkRefs, ProposalRefs, RefLink, refsAsText, RefText } from './proposalRefs.js';
 
 type Props = { participant: Participant; all: Participant[]; rounds: Round[]; activity?: string; roundRunning: boolean; latestRound: number; onRetry: () => void };
 
@@ -9,11 +10,11 @@ const PREVIEW = 80;
 
 const VERDICT_LABEL: Record<Verdict, string> = { send: 'Send', revise: 'Revise', rethink: 'Rethink', dont_send: "Don't send" };
 
-function summary(note: { status: string; note?: string }, activity?: string): string {
+function summary(note: { status: string; note?: string }, proposals: Proposal[], activity?: string): string {
   if (note.status === 'running') return activity ? `${activity}…` : 'Reviewing…';
   if (note.status === 'stopped') return 'Stopped';
   if (note.status === 'error') return 'Error';
-  const text = (note.note ?? '').trim();
+  const text = refsAsText((note.note ?? '').trim(), proposals);
   return text.length > PREVIEW ? `${text.slice(0, PREVIEW)}…` : text;
 }
 
@@ -22,6 +23,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
   const [picked, setPicked] = useState<number>();
   const [showAnswer, setShowAnswer] = useState(false);
   const [open, setOpen] = useState(false);
+  const proposals = useContext(ProposalRefs)?.proposals ?? [];
   const round = rounds.find((r) => r.n === picked) ?? rounds.at(-1);
   const note = round?.notes[participant.id];
   if (!round || !note) return null;
@@ -37,7 +39,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
           <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
           {verdict}
         </span>
-        <span className="note-summary">{summary(note, activity)}</span>
+        <span className="note-summary">{summary(note, proposals, activity)}</span>
       </button>
     );
   }
@@ -58,7 +60,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
       </div>
       {note.status === 'running' && <p className="activity">{activity ? `${activity}…` : 'Reviewing…'}</p>}
       {note.status === 'stopped' && <p className="muted">Stopped.</p>}
-      {note.note && <p>{note.note}</p>}
+      {note.note && <p><RefText text={note.note} /></p>}
       {note.rejected?.length ? (
         <ul className="couldnt-place">
           {note.rejected.map((r, i) => <li key={i}>Couldn't place "{r.quote}" ({r.reason})</li>)}
@@ -75,7 +77,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
       {note.answer && (
         <>
           <button className="ghost" onClick={() => setShowAnswer((s) => !s)}>{showAnswer ? 'Hide answer' : 'Full answer'}</button>
-          {showAnswer && <div className="full-answer"><Markdown>{note.answer}</Markdown></div>}
+          {showAnswer && <div className="full-answer"><Markdown components={{ a: RefLink }}>{linkRefs(note.answer, proposals)}</Markdown></div>}
         </>
       )}
     </div>

@@ -224,3 +224,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 .tag.verdict.rethink { border-color: var(--claude); color: var(--claude); }
 .tag.verdict.dont_send { border-color: var(--error); color: var(--error); }
 .review-summary .note-model { margin-left: 2px; font-size: 12px; }
+
+/* A reviewer's reference to a proposal, shown as the words it changes. */
+.prop-ref { color: var(--accent); cursor: pointer; border-bottom: 1px dotted currentColor; }
+.prop-ref.resolved { color: inherit; cursor: help; opacity: 0.75; }
