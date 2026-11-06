@@ -5,11 +5,13 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useRef, useState } from 'react';
 import { applyLink, currentLink } from './link.js';
+import { PasteLines } from './paste.js';
 
 export function docExtensions(): Extensions {
   return [
     StarterKit.configure({ link: { openOnClick: false } }),
     Markdown,
+    PasteLines,
     Placeholder.configure({ placeholder: 'Paste or write the copy you want reviewed.' }),
   ];
 }
