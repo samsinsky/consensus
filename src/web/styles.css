@@ -154,6 +154,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 .not-saved { color: var(--error); font-size: 12px; }
 .doc-editor { position: relative; background: var(--page); border: 1px solid var(--line); border-radius: 10px; padding: 32px 40px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
 .doc-editor .ProseMirror { outline: none; line-height: 1.6; min-height: 50vh; }
+/* Lines sit tight, as in an email: a gap shows only where the writer left an empty line. */
+.doc-editor .ProseMirror p { margin: 0; }
 .doc-editor .ProseMirror p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--muted); float: left; height: 0; pointer-events: none; }
 .link-box { position: absolute; z-index: 3; width: 320px; font: inherit; font-size: 13px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
 .doc-composer { border-top: 1px solid var(--line); padding: 10px 20px 14px; display: flex; flex-direction: column; gap: 8px; }

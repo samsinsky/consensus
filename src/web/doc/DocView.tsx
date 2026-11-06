@@ -9,7 +9,7 @@ import { api } from '../api.js';
 import { AttachmentChip } from '../components/AttachmentChip.js';
 import { ThreadTitle } from '../components/ThreadTitle.js';
 import { placeProposals, shownOption, type Group } from './anchoring.js';
-import { copyFormatted } from './clipboard.js';
+import { cleanText, copyFormatted, tightHtml } from './clipboard.js';
 import { DocEditor } from './DocEditor.js';
 import { editorIndex } from './editorIndex.js';
 import { HistoryMenu } from './HistoryMenu.js';
@@ -193,7 +193,7 @@ export function DocView({ thread, activity, models, defaults }: Props) {
 
   const copy = () => attempt(async () => {
     if (!editor) return;
-    await copyFormatted(editor.getHTML(), editor.getText({ blockSeparator: '\n\n' }).replace(/\n{3,}/g, '\n\n'));
+    await copyFormatted(tightHtml(editor.getHTML()), cleanText(editor.getText({ blockSeparator: '\n' })));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   });
