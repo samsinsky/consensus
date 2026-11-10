@@ -43,6 +43,9 @@ type Props = {
 
 type Pending = { markdown?: string; brief?: string };
 
+/** Clicks here pick or keep a suggestion; any other click clears the focus. */
+const UNFOCUS_EXEMPT = '[data-proposal], .card-slot, .prop-ref';
+
 export function DocView({ thread, activity, models, defaults }: Props) {
   const doc = thread.doc!;
   const [editor, setEditor] = useState<Editor>();
@@ -182,6 +185,22 @@ export function DocView({ thread, activity, models, defaults }: Props) {
     setFocused(id);
   };
   const refs = useMemo(() => ({ proposals: doc.proposals, onJump: jumpTo }), [doc.proposals, layout]);
+
+  // Focusing fades every other suggestion, so there has to be a way back: Escape, or a click anywhere that
+  // isn't a suggestion, its card, or a reviewer's reference to one.
+  useEffect(() => {
+    if (!focused) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setFocused(undefined);
+    const onClick = (e: MouseEvent) => {
+      if (!(e.target as Element).closest?.(UNFOCUS_EXEMPT)) setFocused(undefined);
+    };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('click', onClick);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('click', onClick);
+    };
+  }, [focused]);
 
   const latest = doc.rounds.at(-1);
   const running = !!latest && Object.values(latest.notes).some((n) => n.status === 'running');

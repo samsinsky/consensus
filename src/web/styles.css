@@ -171,6 +171,9 @@ body.resizing { cursor: col-resize; user-select: none; }
 .prop-new.codex { background: color-mix(in srgb, var(--codex) 18%, transparent); }
 .prop-new.gemini { background: color-mix(in srgb, var(--gemini) 18%, transparent); }
 .prop-old.focused, .prop-new.focused { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Others fade while one is focused. A nested strike would cover the focused one's, so a faded strike nearly disappears. */
+.prop-old.dim { text-decoration-color: color-mix(in srgb, var(--muted) 30%, transparent); }
+.prop-new.dim { opacity: 0.4; }
 .margin { display: flex; flex-direction: column; gap: 8px; }
 .notes { display: flex; flex-direction: column; gap: 8px; }
 .cards { position: relative; }

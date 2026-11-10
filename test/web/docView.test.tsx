@@ -65,6 +65,21 @@ describe('DocView', () => {
     expect(host.textContent).toContain('2 versions');
   });
 
+  it('focuses a suggestion from its text and clears the focus on a click elsewhere or Escape', async () => {
+    await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
+    const focusedCard = () => host.querySelector('.card-slot .card.focused');
+    click(host.querySelector('.prop-old[data-proposal="P1"]')!);
+    expect(focusedCard()).not.toBeNull();
+    click(host.querySelector('.card-slot .card')!);
+    expect(focusedCard()).not.toBeNull();
+    click(host.querySelector('textarea.brief-input')!);
+    expect(focusedCard()).toBeNull();
+    click(host.querySelector('.prop-old[data-proposal="P1"]')!);
+    expect(focusedCard()).not.toBeNull();
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(focusedCard()).toBeNull();
+  });
+
   it('accepts an option: edits the text and settles the group', async () => {
     await act(async () => root.render(<DocView thread={thread()} activity={{}} models={models} defaults={defaults} />));
     await act(async () => click(button('Accept A')));

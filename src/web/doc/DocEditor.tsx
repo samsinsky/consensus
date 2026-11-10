@@ -22,7 +22,8 @@ type Props = {
   revision: number;
   onChange: (markdown: string) => void;
   onReady: (editor: Editor) => void;
-  onPick: (proposalId: string) => void;
+  /** A proposal's text was clicked, or, with no id, plain text: clear the focus. */
+  onPick: (proposalId?: string) => void;
   extensions?: Extensions;
 };
 
@@ -72,8 +73,7 @@ export function DocEditor({ markdown, revision, onChange, onReady, onPick, exten
       ref={wrap}
       className="doc-editor"
       onClick={(e) => {
-        const id = (e.target as HTMLElement).closest<HTMLElement>('[data-proposal]')?.dataset.proposal;
-        if (id) onPick(id);
+        onPick((e.target as HTMLElement).closest<HTMLElement>('[data-proposal]')?.dataset.proposal);
       }}
     >
       <EditorContent editor={editor} />

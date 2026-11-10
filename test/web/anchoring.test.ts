@@ -71,4 +71,33 @@ describe('showProposals', () => {
     showProposals(ed, []);
     expect(ed.view.dom.querySelector('[data-proposal]')).toBeNull();
   });
+
+  it('fades the other suggestions while one is focused, and none when nothing is', () => {
+    const ed = make('I have gone deep on LLMs.');
+    const { groups } = placeProposals([prop({ id: 'P1', quote: 'gone deep on' }), prop({ id: 'P2', quote: 'LLMs' })], editorIndex(ed.state.doc));
+    const shown = (focused?: string) =>
+      groups.map((g) => ({ id: g.key, from: g.options[0].from, to: g.options[0].to, replacement: 'x', provider: 'claude' as const, focused: g.key === focused }));
+    const cls = (id: string) => ed.view.dom.querySelector(`[data-proposal="${id}"].prop-old`)!.className;
+    showProposals(ed, shown('P1'));
+    expect(cls('P1')).not.toContain('dim');
+    expect(cls('P2')).toContain('dim');
+    showProposals(ed, shown());
+    expect(cls('P2')).not.toContain('dim');
+  });
+
+  it('keeps the focused strike whole where a faded suggestion overlaps it', () => {
+    const ed = make('replaces days of work with a 2-minute import here');
+    const { groups } = placeProposals(
+      [prop({ id: 'P1', quote: 'replaces days of work with a 2-minute import' }), prop({ id: 'P2', quote: 'with a 2-minute import here' })],
+      editorIndex(ed.state.doc),
+    );
+    const all = groups.flatMap((g) => g.options);
+    const shown = (focused: string) =>
+      all.map((o) => ({ id: o.proposal.id, from: o.from, to: o.to, replacement: '', provider: 'claude' as const, focused: o.proposal.id === focused }));
+    const text = (sel: string) => [...ed.view.dom.querySelectorAll(sel)].map((e) => e.textContent).join('|');
+    showProposals(ed, shown('P1'));
+    expect(text('.prop-old.focused')).toBe('replaces days of work with a 2-minute import');
+    expect(text('.prop-old.dim')).toBe(' here');
+    expect(ed.view.dom.querySelector('.prop-old.focused.dim')).toBeNull();
+  });
 });
