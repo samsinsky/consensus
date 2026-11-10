@@ -3,6 +3,7 @@ import { modelLabel, participantLabel, participantName } from '../../shared/labe
 import type { ModelOption, ProviderDefaults, ProviderId, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
 import { ModelPicker } from '../components/ModelPicker.js';
+import { Dot } from '../components/Dot.js';
 
 type Props = {
   thread: Thread;
@@ -80,7 +81,7 @@ export function ReviewBar({ thread, models, defaults, activity, running }: Props
             <div key={p.id} className={included.has(p.id) ? 'review-row included' : 'review-row'}>
               <button className="review-name" onClick={() => act(() => api.setIncluded(thread.id, p.id, !included.has(p.id)))}>
                 <span className="check">{included.has(p.id) ? '✓' : ''}</span>
-                <span className={`dot ${p.provider}`} /> {participantLabel(p, thread.participants)}
+                <Dot p={p} all={thread.participants} /> {participantLabel(p, thread.participants)}
                 {busy(p.id) && <span className="spinner" />}
               </button>
               <button className="ghost review-remove" title="Remove from this thread" onClick={() => act(() => api.removeParticipant(thread.id, p.id))}>×</button>

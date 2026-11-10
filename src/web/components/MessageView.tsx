@@ -6,6 +6,7 @@ import { api } from '../api.js';
 import { AttachmentChip } from './AttachmentChip.js';
 import { CollapsibleQuote } from './CollapsibleQuote.js';
 import { Sources } from './Sources.js';
+import { Dot } from './Dot.js';
 
 type Props = { thread: Thread; message: Message; activity?: string; onForward: (q: Quote) => void; onOpenDoc?: (replyId: string) => void };
 
@@ -29,7 +30,6 @@ export function MessageView({ thread, message, activity, onForward, onOpenDoc }:
     const p = thread.participants.find((x) => x.id === id);
     return p ? participantLabel(p, thread.participants) : 'Removed participant';
   };
-  const provider = (id: string) => thread.participants.find((x) => x.id === id)?.provider ?? 'claude';
   const act = (fn: () => Promise<unknown>) => fn().catch((e: Error) => setActionError(e.message));
 
   if (message.kind === 'model_change') {
@@ -40,7 +40,7 @@ export function MessageView({ thread, message, activity, onForward, onOpenDoc }:
   if (message.kind === 'user') {
     return (
       <div className="msg user">
-        <div className="msg-head">You → <span className={`dot ${provider(message.to)}`} /> {label(message.to)}</div>
+        <div className="msg-head">You → <Dot p={thread.participants.find((x) => x.id === message.to)} all={thread.participants} /> {label(message.to)}</div>
         {message.quotes.map((q, i) => (
           <CollapsibleQuote key={i} text={q.text} />
         ))}
@@ -66,7 +66,7 @@ export function MessageView({ thread, message, activity, onForward, onOpenDoc }:
   return (
     <div className={`msg reply ${message.status}`}>
       <div className="msg-head">
-        <span className={`dot ${provider(message.from)}`} /> {author ? replyLabel(message, author, thread.participants) : 'Removed participant'}
+        <Dot p={author} all={thread.participants} /> {author ? replyLabel(message, author, thread.participants) : 'Removed participant'}
         {message.status === 'stopped' && <span className="badge">stopped</span>}
       </div>
       <div className="msg-body" ref={body}>

@@ -4,7 +4,8 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { ProviderId } from '../../shared/types.js';
 
-export type Shown = { id: string; from: number; to: number; replacement: string; provider: ProviderId; focused: boolean };
+/** color: the author's own shade, when it differs from its provider's (a second Claude, say). */
+export type Shown = { id: string; from: number; to: number; replacement: string; provider: ProviderId; color?: string; focused: boolean };
 
 const key = new PluginKey<DecorationSet>('consensusProposals');
 
@@ -36,10 +37,11 @@ function build(doc: PMNode, shown: Shown[]): DecorationSet {
   const focus = shown.find((s) => s.focused);
   for (const s of shown) {
     const cls = `${s.provider}${s.focused ? ' focused' : focus ? ' dim' : ''}`;
+    const style = s.color ? `--who: ${s.color}` : undefined;
     // ProseMirror merges overlapping decorations into one span with both classes, so a faded one would fade the
     // focused strike too. Faded ranges skip the focused one's words.
     for (const [from, to] of focus && !s.focused ? outside(s, focus) : [[s.from, s.to]]) {
-      decorations.push(Decoration.inline(from, to, { class: `prop-old ${cls}`, 'data-proposal': s.id }));
+      decorations.push(Decoration.inline(from, to, { class: `prop-old ${cls}`, 'data-proposal': s.id, ...(style && { style }) }));
     }
     if (s.replacement) {
       decorations.push(
@@ -47,9 +49,10 @@ function build(doc: PMNode, shown: Shown[]): DecorationSet {
           const el = document.createElement('span');
           el.className = `prop-new ${cls}`;
           el.dataset.proposal = s.id;
+          if (s.color) el.style.setProperty('--who', s.color);
           el.textContent = s.replacement;
           return el;
-        }, { side: 1, key: `${s.id}:${cls}:${s.replacement}` }),
+        }, { side: 1, key: `${s.id}:${cls}:${s.color ?? ''}:${s.replacement}` }),
       );
     }
   }

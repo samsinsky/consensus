@@ -6,6 +6,7 @@ import { ThreadTitle } from './ThreadTitle.js';
 import { nextActive, paneMessages } from '../threadState.js';
 import { Composer } from './Composer.js';
 import { MessageList } from './MessageList.js';
+import { Dot } from './Dot.js';
 
 type Props = {
   thread: Thread;
@@ -66,7 +67,7 @@ export function ThreadView({ thread, activity, models, defaults, onOpenThread }:
           {thread.participants.map((p) => (
             <label key={p.id}>
               <input type="checkbox" checked={!hidden.has(p.id)} onChange={() => toggle(p.id)} />
-              <span className={`dot ${p.provider}`} /> {participantLabel(p, thread.participants)}
+              <Dot p={p} all={thread.participants} /> {participantLabel(p, thread.participants)}
             </label>
           ))}
         </div>
@@ -79,7 +80,7 @@ export function ThreadView({ thread, activity, models, defaults, onOpenThread }:
         <div className="panes">
           {shown.map((p) => (
             <section key={p.id} className="pane">
-              <h2><span className={`dot ${p.provider}`} /> {participantLabel(p, thread.participants)}</h2>
+              <h2><Dot p={p} all={thread.participants} /> {participantLabel(p, thread.participants)}</h2>
               {composer(p.id, true, <MessageList thread={thread} messages={paneMessages(thread, p.id)} activity={activity} onForward={forward} onOpenDoc={openDoc} />)}
             </section>
           ))}

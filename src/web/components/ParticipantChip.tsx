@@ -3,6 +3,7 @@ import { participantLabel } from '../../shared/labels.js';
 import type { ModelOption, ProviderDefaults, ProviderId, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
 import { ModelPicker } from './ModelPicker.js';
+import { Dot } from './Dot.js';
 
 type Props = {
   thread: Thread;
@@ -66,7 +67,7 @@ export function ParticipantChip({ thread, models, defaults, target, onSelect }: 
   return (
     <div className="chip-wrap" ref={wrap}>
       <button className={`chip ${current?.provider ?? ''}`} onClick={() => (open ? close() : setOpen(true))}>
-        {current ? <><span className={`dot ${current.provider}`} /> {participantLabel(current, thread.participants)}</> : 'Choose a participant'} ▾
+        {current ? <><Dot p={current} all={thread.participants} /> {participantLabel(current, thread.participants)}</> : 'Choose a participant'} ▾
       </button>
       {open && (
         <div className="chip-menu">
@@ -76,7 +77,7 @@ export function ParticipantChip({ thread, models, defaults, target, onSelect }: 
               {thread.participants.map((p) => (
                 <div key={p.id} className="menu-row">
                   <button className="menu-item" onClick={() => { onSelect(p.id); close(); }}>
-                    <span className={`dot ${p.provider}`} /> {participantLabel(p, thread.participants)} {p.id === target && '✓'}
+                    <Dot p={p} all={thread.participants} /> {participantLabel(p, thread.participants)} {p.id === target && '✓'}
                   </button>
                   <button className="ghost" onClick={() => setMode({ kind: 'change', participantId: p.id })}>Change model</button>
                 </div>

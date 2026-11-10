@@ -5,6 +5,7 @@ import type { Participant, Proposal, ProposalReply } from '../../shared/types.js
 import { useAutoGrow } from '../useAutoGrow.js';
 import type { Group } from './anchoring.js';
 import { RefText } from './proposalRefs.js';
+import { Dot } from '../components/Dot.js';
 
 const LETTERS = 'ABCDEFGHIJ';
 const STANCE = { agree: 'agree', disagree: 'disagree', your_call: 'your call' } as const;
@@ -16,10 +17,6 @@ export function authorLabel(ids: string[], all: Participant[]): string {
       return p ? participantLabel(p, all) : 'Removed participant';
     })
     .join(' and ');
-}
-
-function providerOf(ids: string[], all: Participant[]): string {
-  return all.find((x) => x.id === ids[0])?.provider ?? '';
 }
 
 type Props = {
@@ -105,7 +102,7 @@ export function StaleCard({ proposal, participants, onDismiss }: { proposal: Pro
 }
 
 function Author({ p, all }: { p: Proposal; all: Participant[] }) {
-  return <span className="author"><span className={`dot ${providerOf(p.authors, all)}`} /> {authorLabel(p.authors, all)}</span>;
+  return <span className="author"><Dot p={all.find((x) => x.id === p.authors[0])} all={all} /> {authorLabel(p.authors, all)}</span>;
 }
 
 function Counts({ p, all }: { p: Proposal; all: Participant[] }) {

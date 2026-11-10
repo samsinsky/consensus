@@ -8,6 +8,7 @@ import { useAttachments } from '../useAttachments.js';
 import { AttachmentChip } from './AttachmentChip.js';
 import { CollapsibleQuote } from './CollapsibleQuote.js';
 import { ParticipantChip } from './ParticipantChip.js';
+import { Dot } from './Dot.js';
 
 type Props = {
   thread: Thread;
@@ -109,7 +110,7 @@ export function Composer({ thread, models, defaults, target, lockTarget, onTarge
       <div className="composer-row">
         <span className="to">To:</span>
         {lockTarget && lockedParticipant ? (
-          <span className="chip static"><span className={`dot ${lockedParticipant.provider}`} /> {participantLabel(lockedParticipant, thread.participants)}</span>
+          <span className="chip static"><Dot p={lockedParticipant} all={thread.participants} /> {participantLabel(lockedParticipant, thread.participants)}</span>
         ) : (
           <ParticipantChip thread={thread} models={models} defaults={defaults} target={target} onSelect={onTargetChange} />
         )}

@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import { modelLabel, participantName } from '../../shared/labels.js';
 import type { Participant, Proposal, Round, Verdict } from '../../shared/types.js';
 import { linkRefs, ProposalRefs, RefLink, refsAsText, RefText } from './proposalRefs.js';
+import { Dot } from '../components/Dot.js';
 
 type Props = { participant: Participant; all: Participant[]; rounds: Round[]; activity?: string; roundRunning: boolean; latestRound: number; onRetry: () => void };
 
@@ -35,7 +36,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
     return (
       <button className="card note note-line" onClick={() => setOpen(true)}>
         <span className="author">
-          <span className={`dot ${participant.provider}`} /> {participantName(participant, all)}
+          <Dot p={participant} all={all} /> {participantName(participant, all)}
           <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
           {verdict}
         </span>
@@ -48,7 +49,7 @@ export function NoteCard({ participant, all, rounds, activity, roundRunning, lat
     <div className="card note">
       <div className="card-head">
         <span className="author" onClick={() => setOpen(false)} title="Collapse">
-          <span className={`dot ${participant.provider}`} /> {participantName(participant, all)}
+          <Dot p={participant} all={all} /> {participantName(participant, all)}
           <span className="note-model">{modelLabel(participant.model, participant.effort)}</span>
           {verdict}
         </span>

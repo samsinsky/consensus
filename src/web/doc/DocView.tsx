@@ -4,7 +4,8 @@ import { checkFile } from '../../shared/attachmentRules.js';
 import type { TextIndex } from '../../shared/anchor.js';
 import { changedSpan, settle } from '../../shared/change.js';
 import { RESOLVED } from '../../shared/proposals.js';
-import type { ModelOption, ProviderDefaults, ProviderId, Thread } from '../../shared/types.js';
+import { hueShift, participantColor } from '../../shared/labels.js';
+import type { ModelOption, Participant, ProviderDefaults, ProviderId, Thread } from '../../shared/types.js';
 import { api } from '../api.js';
 import { AttachmentChip } from '../components/AttachmentChip.js';
 import { ThreadTitle } from '../components/ThreadTitle.js';
@@ -128,7 +129,9 @@ export function DocView({ thread, activity, models, defaults }: Props) {
     [editor, version, doc.proposals],
   );
 
-  const providerOf = (id: string) => thread.participants.find((p) => p.id === id)?.provider ?? 'claude';
+  const authorOf = (id: string) => thread.participants.find((p) => p.id === id);
+  // Only a shifted shade needs passing; the provider class already gives the brand color.
+  const shade = (p?: Participant) => (p && hueShift(p, thread.participants) ? participantColor(p, thread.participants) : undefined);
 
   useEffect(() => {
     if (!editor) return;
@@ -136,7 +139,8 @@ export function DocView({ thread, activity, models, defaults }: Props) {
       const o = shownOption(g, picked);
       return {
         id: o.proposal.id, from: o.from, to: o.to, replacement: o.proposal.replacement,
-        provider: providerOf(o.proposal.authors[0]),
+        provider: authorOf(o.proposal.authors[0])?.provider ?? 'claude',
+        color: shade(authorOf(o.proposal.authors[0])),
         focused: g.options.some((x) => x.proposal.id === focused),
       };
     }));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { modelLabel, participantLabel, participantName, replyLabel } from '../../src/shared/labels.js';
+import { hueShift, modelLabel, participantColor, participantLabel, participantName, replyLabel } from '../../src/shared/labels.js';
 import type { Participant, ReplyMessage } from '../../src/shared/types.js';
 
 const p = (id: string, provider: Participant['provider'], model: string, effort?: string, ordinal?: number): Participant => ({
@@ -49,3 +49,13 @@ describe('labels', () => {
   });
 });
 
+
+describe('participant colors', () => {
+  it('keeps the brand color for a lone or first participant and shifts the others, alternating sides', () => {
+    const all = [p('a', 'claude', 'opus', 'high', 1), p('b', 'claude', 'opus', 'high', 2), p('c', 'claude', 'sonnet', 'high', 3), p('g', 'gemini', 'flash')];
+    expect(all.map((x) => hueShift(x, all))).toEqual([0, 45, -45, 0]);
+    expect(participantColor(all[0], all)).toBe('var(--claude)');
+    expect(participantColor(all[1], all)).toBe('oklch(from var(--claude) l c calc(h + 45))');
+    expect(participantColor(all[3], all)).toBe('var(--gemini)');
+  });
+});

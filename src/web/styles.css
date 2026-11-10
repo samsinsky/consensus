@@ -38,7 +38,9 @@ textarea, select { font: inherit; color: inherit; background: var(--panel); bord
 .msg-actions { display: flex; gap: 6px; margin-top: 4px; }
 .msg-actions button { font-size: 12px; padding: 3px 8px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.dot.claude { background: var(--claude); } .dot.codex { background: var(--codex); } .dot.gemini { background: var(--gemini); }
+.dot { background: var(--who, var(--muted)); }
+/* A participant's color. Elements set --who themselves when a second participant from the provider shifts it. */
+.claude { --who: var(--claude); } .codex { --who: var(--codex); } .gemini { --who: var(--gemini); }
 .badge { font-size: 11px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; }
 .quote { margin: 0; padding: 6px 10px; border-left: 3px solid var(--line); color: var(--muted); white-space: pre-wrap; }
 .quote.collapsed { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -164,12 +166,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 .brief-input { flex: 1; width: 100%; resize: none; line-height: 1.45; max-height: calc(100dvh - 180px); overflow-y: auto; padding: 9px 46px 9px 40px; }
 .prop-old { text-decoration: line-through; text-decoration-thickness: 2px; cursor: pointer; }
 .prop-new { cursor: pointer; border-radius: 3px; padding: 0 2px; margin-left: 2px; }
-.prop-old.claude, .prop-new.claude { text-decoration-color: var(--claude); }
-.prop-old.codex, .prop-new.codex { text-decoration-color: var(--codex); }
-.prop-old.gemini, .prop-new.gemini { text-decoration-color: var(--gemini); }
-.prop-new.claude { background: color-mix(in srgb, var(--claude) 18%, transparent); }
-.prop-new.codex { background: color-mix(in srgb, var(--codex) 18%, transparent); }
-.prop-new.gemini { background: color-mix(in srgb, var(--gemini) 18%, transparent); }
+.prop-old, .prop-new { text-decoration-color: var(--who); }
+.prop-new { background: color-mix(in srgb, var(--who) 18%, transparent); }
 .prop-old.focused, .prop-new.focused { outline: 2px solid var(--accent); outline-offset: 1px; }
 /* Others fade while one is focused. A nested strike would cover the focused one's, so a faded strike nearly disappears. */
 .prop-old.dim { text-decoration-color: color-mix(in srgb, var(--muted) 30%, transparent); }
