@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ThreadKind, ThreadSummary } from '../../shared/types.js';
+import type { ThreadSummary } from '../../shared/types.js';
 import { clampSidebarWidth } from '../layout.js';
 
 type Props = {
@@ -10,14 +10,13 @@ type Props = {
   onResize: (width: number) => void;
   onToggle: () => void;
   onSelect: (id: string) => void;
-  onNew: (kind: ThreadKind) => void;
+  onNew: () => void;
   onSettings: () => void;
   onDelete: (id: string) => void;
 };
 
 export function ThreadsSidebar({ threads, activeId, collapsed, width, onResize, onToggle, onSelect, onNew, onSettings, onDelete }: Props) {
   const [confirming, setConfirming] = useState<string>();
-  const [choosing, setChoosing] = useState(false);
 
   const gear = (
     <button className="ghost settings-gear" onClick={onSettings} title="Settings" aria-label="Settings">
@@ -57,13 +56,7 @@ export function ThreadsSidebar({ threads, activeId, collapsed, width, onResize, 
         <strong>Consensus</strong>
         <button className="ghost" onClick={onToggle} title="Hide threads">«</button>
       </div>
-      <button className="new-thread" onClick={() => setChoosing((c) => !c)}>+ New thread</button>
-      {choosing && (
-        <div className="new-choice">
-          <button onClick={() => { setChoosing(false); onNew('chat'); }}>Chat</button>
-          <button onClick={() => { setChoosing(false); onNew('doc'); }}>Doc</button>
-        </div>
-      )}
+      <button className="new-thread" onClick={onNew}>+ New doc</button>
       <ul>
         {threads.map((t) =>
           confirming === t.id ? (

@@ -4,8 +4,9 @@ export function modelLabel(model: string, effort?: string): string {
   return effort ? `${model} ${effort}` : model;
 }
 
-/** "Claude" alone, or "Claude #2" when the thread has several Claude participants. */
+/** The name the user gave it, else "Claude" alone, or "Claude #2" when the thread has several Claude participants. */
 export function participantName(p: Participant, all: Participant[]): string {
+  if (p.name) return p.name;
   const siblings = all.filter((o) => o.provider === p.provider);
   const name = PROVIDERS[p.provider].name;
   if (siblings.length < 2) return name;

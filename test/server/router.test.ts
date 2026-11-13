@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -202,6 +202,39 @@ describe('Router', () => {
     expect(thread.messages.at(-1)).toMatchObject({ kind: 'model_change', participant: a.id, from: 'opus high', to: 'sonnet medium' });
     await router.send(t.id, { to: a.id, text: 'Go' });
     expect(claude.requests[0]).toMatchObject({ model: 'sonnet', effort: 'medium' });
+  });
+
+  it('appends a participant\'s instructions to its own prompt only, from its next turn', async () => {
+    const { t, a } = await threadWithTwo();
+    const first = await router.send(t.id, { to: a.id, text: 'One' });
+    const plain = claude.requests[0];
+    claude.last().push({ type: 'session', sessionId: 's1' });
+    claude.last().push({ type: 'done', text: 'ok' });
+    claude.last().end();
+    await first.done;
+    await router.updateParticipant(t.id, a.id, { name: '  Fact checker ', instructions: 'Check every claim.\nIgnore style.' });
+    expect((await router.getThread(t.id))!.participants[0]).toMatchObject({ name: 'Fact checker', instructions: 'Check every claim.\nIgnore style.' });
+    const second = await router.send(t.id, { to: a.id, text: 'Two' });
+    await new Promise((r) => setTimeout(r, 10));
+    const focused = claude.requests[1];
+    claude.last().push({ type: 'session', sessionId: 's2' });
+    claude.last().push({ type: 'done', text: 'ok' });
+    claude.last().end();
+    await second.done;
+    const third = await router.send(t.id, { to: a.id, text: 'Three' });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(claude.requests[2].message).not.toContain('changed your instructions');
+    claude.last().push({ type: 'done', text: 'ok' });
+    claude.last().end();
+    await third.done;
+    expect(focused.promptHash).not.toBe(plain.promptHash);
+    const text = await readFile(focused.promptPath, 'utf8');
+    expect(text.startsWith((await readFile(plain.promptPath, 'utf8')).trimEnd())).toBe(true);
+    expect(text).toContain('Check every claim.\nIgnore style.');
+    // The resumed session started without them, so the message carries them once.
+    expect(focused.message).toMatch(/^\[The user changed your instructions[\s\S]*Check every claim\.\nIgnore style\.\]\n\n/);
+    await router.updateParticipant(t.id, a.id, { name: '', instructions: ' ' });
+    expect((await router.getThread(t.id))!.participants[0].instructions).toBeUndefined();
   });
 
   it('refuses a model change while the participant is replying', async () => {

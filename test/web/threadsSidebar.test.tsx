@@ -29,7 +29,7 @@ describe('ThreadsSidebar', () => {
     expect(clampSidebarWidth(900)).toBe(480);
   });
 
-  it('offers Chat or Doc for a new thread and marks doc threads', () => {
+  it('starts a new doc in one click and marks doc threads', () => {
     const onNew = vi.fn();
     const host = document.createElement('div');
     act(() => createRoot(host).render(
@@ -39,10 +39,9 @@ describe('ThreadsSidebar', () => {
     const rows = host.querySelectorAll('.thread-row');
     expect(rows[0].querySelector('.doc-icon')).toBeNull();
     expect(rows[1].querySelector('.doc-icon')).not.toBeNull();
-    act(() => (host.querySelector('.new-thread') as HTMLButtonElement).click());
-    const choice = [...host.querySelectorAll('.new-choice button')] as HTMLButtonElement[];
-    expect(choice.map((b) => b.textContent)).toEqual(['Chat', 'Doc']);
-    act(() => choice[1].click());
-    expect(onNew).toHaveBeenCalledWith('doc');
+    const button = host.querySelector('.new-thread') as HTMLButtonElement;
+    expect(button.textContent).toBe('+ New doc');
+    act(() => button.click());
+    expect(onNew).toHaveBeenCalledOnce();
   });
 });

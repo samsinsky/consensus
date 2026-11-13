@@ -4,6 +4,7 @@ import type { ModelOption, ProviderDefaults, ProviderId, Thread } from '../../sh
 import { api } from '../api.js';
 import { ModelPicker } from './ModelPicker.js';
 import { Dot } from './Dot.js';
+import { ParticipantForm } from './ParticipantForm.js';
 
 type Props = {
   thread: Thread;
@@ -13,7 +14,7 @@ type Props = {
   onSelect: (participantId: string) => void;
 };
 
-type Mode = { kind: 'list' } | { kind: 'new' } | { kind: 'change'; participantId: string };
+type Mode = { kind: 'list' } | { kind: 'new' } | { kind: 'change'; participantId: string } | { kind: 'edit'; participantId: string };
 
 export function ParticipantChip({ thread, models, defaults, target, onSelect }: Props) {
   const [open, setOpen] = useState(thread.participants.length === 0);
@@ -45,16 +46,6 @@ export function ParticipantChip({ thread, models, defaults, target, onSelect }: 
     };
   }, [open]);
 
-  const create = async (provider: ProviderId, model: string, effort?: string) => {
-    try {
-      const p = await api.addParticipant(thread.id, { provider, model, effort });
-      onSelect(p.id);
-      close();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
   const change = async (participantId: string, model: string, effort?: string) => {
     try {
       await api.changeModel(thread.id, participantId, { model, effort });
@@ -80,17 +71,24 @@ export function ParticipantChip({ thread, models, defaults, target, onSelect }: 
                     <Dot p={p} all={thread.participants} /> {participantLabel(p, thread.participants)} {p.id === target && '✓'}
                   </button>
                   <button className="ghost" onClick={() => setMode({ kind: 'change', participantId: p.id })}>Change model</button>
+                  <button className="ghost" title="Name and instructions" onClick={() => setMode({ kind: 'edit', participantId: p.id })}>✎</button>
                 </div>
               ))}
               <button className="menu-item new" onClick={() => setMode({ kind: 'new' })}>+ New participant</button>
             </>
           )}
           {mode.kind === 'new' && (
-            <>
-              <div className="menu-label">New participant</div>
-              <ModelPicker models={models} defaults={defaults} submitLabel="Add" onPick={create} />
-            </>
+            <ParticipantForm threadId={thread.id} models={models} defaults={defaults} onAdded={(p) => onSelect(p.id)} onDone={close} />
           )}
+          {mode.kind === 'edit' && (() => {
+            const p = thread.participants.find((x) => x.id === mode.participantId)!;
+            return (
+              <>
+                <div className="menu-label">{participantLabel(p, thread.participants)}</div>
+                <ParticipantForm threadId={thread.id} models={models} defaults={defaults} editing={p} onDone={() => setMode({ kind: 'list' })} />
+              </>
+            );
+          })()}
           {mode.kind === 'change' && (() => {
             const p = thread.participants.find((x) => x.id === mode.participantId)!;
             return (

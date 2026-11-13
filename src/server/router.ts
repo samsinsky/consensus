@@ -7,7 +7,7 @@ import type { ImageInput, ProviderAdapter } from './adapters/types.js';
 import { ATTACHMENT_LIMITS, AttachmentStore, truncationNote } from './attachments.js';
 import type { EventHub } from './hub.js';
 import type { Paths } from './paths.js';
-import { snapshotPath, snapshotPrompt } from './prompt.js';
+import { participantPrompt, snapshotPath, snapshotPrompt } from './prompt.js';
 import type { ThreadStore } from './store.js';
 
 export class RouterError extends Error {
@@ -211,7 +211,10 @@ export class Router {
     return removed;
   }
 
-  async addParticipant(threadId: string, input: { provider: ProviderId; model: string; effort?: string }): Promise<Participant> {
+  async addParticipant(
+    threadId: string,
+    input: { provider: ProviderId; model: string; effort?: string; name?: string; instructions?: string },
+  ): Promise<Participant> {
     const thread = await this.mustThread(threadId);
     const participant: Participant = {
       id: randomUUID(),
@@ -219,6 +222,7 @@ export class Router {
       model: input.model,
       effort: input.effort || undefined,
       promptHash: await snapshotPrompt(this.deps.paths),
+      ...cleanFocus(input),
       ordinal: thread.participants.filter((x) => x.provider === input.provider).length + 1,
       createdAt: new Date().toISOString(),
     };
@@ -239,6 +243,17 @@ export class Router {
       id: randomUUID(), kind: 'model_change', participant: p.id,
       from, to: modelLabel(p.model, p.effort), sentAt: new Date().toISOString(),
     });
+    await this.commit(thread);
+  }
+
+  /** Renames a participant or changes its instructions; the instructions apply from its next turn. */
+  async updateParticipant(threadId: string, participantId: string, input: { name?: string; instructions?: string }): Promise<void> {
+    const thread = await this.mustThread(threadId);
+    const p = this.mustParticipant(thread, participantId);
+    if (this.busy.has(p.id)) throw new RouterError('busy', 'That participant is still replying.');
+    const next = cleanFocus(input);
+    if ('name' in input) p.name = next.name;
+    if ('instructions' in input) p.instructions = next.instructions;
     await this.commit(thread);
   }
 
@@ -379,9 +394,13 @@ export class Router {
     const sources: string[] = [];
     let result: TurnResult | undefined;
     try {
+      const hash = p.instructions ? await participantPrompt(this.deps.paths, p) : p.promptHash;
+      // A resumed session keeps the system prompt it started with, so a change mid-conversation travels in the message.
+      const started = p.sessionPromptHash ?? p.promptHash;
+      if (p.sessionId && started !== hash) message = `${instructionsNote(p.instructions)}\n\n${message}`;
       for await (const ev of adapter.send({
         sessionId: p.sessionId, message, model: p.model, effort: p.effort,
-        promptHash: p.promptHash, promptPath: snapshotPath(this.deps.paths, p.promptHash),
+        promptHash: hash, promptPath: snapshotPath(this.deps.paths, hash),
         images: images.length ? images : undefined,
         signal,
       })) {
@@ -401,7 +420,11 @@ export class Router {
           console.warn(`consensus: ${p.provider}: ${ev.message}`);
         } else if (ev.type === 'done') {
           // Only a finished turn advances memory; stopped or failed forks are dropped.
-          if (pendingSession) p.sessionId = pendingSession;
+          if (pendingSession) {
+            p.sessionId = pendingSession;
+            // The session has now heard this prompt, from its start or from the note above.
+            p.sessionPromptHash = hash === p.promptHash ? undefined : hash;
+          }
           result = { status: 'done', text: ev.text, sources };
         } else if (ev.type === 'error') {
           result = { status: 'error', text, error: ev.error, sources };
@@ -497,4 +520,15 @@ export function deriveTitle(text: string, quotes: Quote[]): string {
   const source = text.trim() || quotes[0]?.text.trim() || UNTITLED;
   const line = source.split('\n')[0].trim();
   return line.length > 60 ? `${line.slice(0, 57)}...` : line;
+}
+
+/** Blank names and instructions are dropped rather than stored. */
+function cleanFocus(input: { name?: string; instructions?: string }): { name?: string; instructions?: string } {
+  return { name: input.name?.trim() || undefined, instructions: input.instructions?.trim() || undefined };
+}
+
+function instructionsNote(instructions?: string): string {
+  return instructions
+    ? `[The user changed your instructions. From now on, follow these in place of any earlier ones:\n\n${instructions}]`
+    : '[The user removed the extra instructions they gave you earlier. Go back to your original instructions.]';
 }

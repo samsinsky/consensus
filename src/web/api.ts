@@ -41,9 +41,11 @@ export const api = {
     call<void>('POST', `/api/threads/${threadId}/proposals/${proposalId}/replies`, { text }),
   restore: (threadId: string, round: number) => call<void>('POST', `/api/threads/${threadId}/restore`, { round }),
   renameThread: (threadId: string, title: string) => call<void>('PATCH', `/api/threads/${threadId}`, { title }),
-  addParticipant: (threadId: string, body: { provider: ProviderId; model: string; effort?: string }) =>
+  addParticipant: (threadId: string, body: { provider: ProviderId; model: string; effort?: string; name?: string; instructions?: string }) =>
     call<Participant>('POST', `/api/threads/${threadId}/participants`, body),
   changeModel: (threadId: string, participantId: string, body: { model: string; effort?: string }) =>
+    call<void>('PATCH', `/api/threads/${threadId}/participants/${participantId}`, body),
+  updateParticipant: (threadId: string, participantId: string, body: { name: string; instructions: string }) =>
     call<void>('PATCH', `/api/threads/${threadId}/participants/${participantId}`, body),
   send: (threadId: string, body: { to: string; text: string; quotes: Quote[]; attachmentIds: string[] }) =>
     call<Sent>('POST', `/api/threads/${threadId}/messages`, body),

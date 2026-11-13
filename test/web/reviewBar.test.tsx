@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Participant, Thread } from '../../src/shared/types.js';
 
 vi.mock('../../src/web/api.js', () => ({
-  api: { setIncluded: vi.fn().mockResolvedValue(undefined), removeParticipant: vi.fn().mockResolvedValue(undefined), addParticipant: vi.fn().mockResolvedValue({}) },
+  api: { setIncluded: vi.fn().mockResolvedValue(undefined), removeParticipant: vi.fn().mockResolvedValue(undefined), addParticipant: vi.fn().mockResolvedValue({}), updateParticipant: vi.fn().mockResolvedValue(undefined) },
 }));
 const { api } = await import('../../src/web/api.js');
 const { ReviewBar } = await import('../../src/web/doc/ReviewBar.js');
@@ -65,6 +65,33 @@ describe('ReviewBar', () => {
     click(rows[1].querySelector('.review-remove')!);
     expect(api.removeParticipant).toHaveBeenCalledWith('t', 'b');
     expect([...host.querySelectorAll('button')].some((b) => b.textContent === '+ Add participant')).toBe(true);
+  });
+
+  it('edits a participant\'s name and instructions inline, under its row', async () => {
+    render(thread(['a']));
+    click(host.querySelector('.review-summary')!);
+    click(host.querySelector('.review-row .review-edit')!);
+    const dialog = host.querySelector('.review-row .participant-form')!;
+    expect(dialog.closest('.review-row')!.querySelector('.review-name')!.textContent).toContain('Claude #1');
+    const type = (el: HTMLInputElement | HTMLTextAreaElement, value: string) => act(() => {
+      const proto = Object.getPrototypeOf(el);
+      Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    type(dialog.querySelector('input')!, 'Fact checker');
+    type(dialog.querySelector('textarea')!, 'Check every claim.\n\nIgnore style.');
+    await act(async () => [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Save')!.click());
+    expect(api.updateParticipant).toHaveBeenCalledWith('t', 'a', { name: 'Fact checker', instructions: 'Check every claim.\n\nIgnore style.' });
+    expect(host.querySelector('.participant-form')).toBeNull();
+    expect(host.querySelector('.review-menu')).not.toBeNull();
+  });
+
+  it('adds a participant with its name and instructions from the menu', async () => {
+    render(thread(['a']));
+    click(host.querySelector('.review-summary')!);
+    click([...host.querySelectorAll('button')].find((b) => b.textContent === '+ Add participant')!);
+    await act(async () => [...host.querySelectorAll('.participant-form button')].find((b) => b.textContent === 'Add')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(api.addParticipant).toHaveBeenCalledWith('t', { provider: 'claude', model: 'opus', effort: undefined, name: '', instructions: '' });
   });
 
   it('shows each running reviewer\'s activity', () => {

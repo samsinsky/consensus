@@ -20,6 +20,12 @@ export type Participant = {
   sessionId?: string;
   /** Hash of the system prompt snapshot this participant started with. */
   promptHash: string;
+  /** Prompt (with instructions) its current session last heard, when that differs from promptHash. */
+  sessionPromptHash?: string;
+  /** Short name the user gave it, shown in place of "Claude #2". */
+  name?: string;
+  /** The user's extra instructions, appended to the shared prompt. */
+  instructions?: string;
   /** 1-based position among this thread's participants from the same provider; fixed at creation. */
   ordinal?: number;
   createdAt: string;

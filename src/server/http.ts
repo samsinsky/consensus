@@ -96,12 +96,22 @@ export function createConsensusServer(deps: Deps): Server {
       const body = await readJson(req);
       if (!PROVIDER_IDS.includes(body.provider)) throw new RouterError('invalid', 'Unknown provider.');
       if (typeof body.model !== 'string' || !body.model) throw new RouterError('invalid', 'Pick a model.');
-      json(res, 200, await router.addParticipant(id, { provider: body.provider, model: body.model, effort: optString(body.effort) }));
+      json(res, 200, await router.addParticipant(id, {
+        provider: body.provider, model: body.model, effort: optString(body.effort),
+        name: optString(body.name), instructions: optString(body.instructions),
+      }));
     }],
     ['PATCH', re(`/api/threads/${ID}/participants/${ID}`), async (req, res, [id, pid]) => {
       const body = await readJson(req);
       if (typeof body.included === 'boolean') {
         await docs.setIncluded(id, pid, body.included);
+        return void res.writeHead(204).end();
+      }
+      if ('name' in body || 'instructions' in body) {
+        const focus: { name?: string; instructions?: string } = {};
+        if ('name' in body) focus.name = typeof body.name === 'string' ? body.name : '';
+        if ('instructions' in body) focus.instructions = typeof body.instructions === 'string' ? body.instructions : '';
+        await router.updateParticipant(id, pid, focus);
         return void res.writeHead(204).end();
       }
       if (typeof body.model !== 'string' || !body.model) throw new RouterError('invalid', 'Pick a model.');

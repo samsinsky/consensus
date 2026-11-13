@@ -143,8 +143,6 @@ body.resizing { cursor: col-resize; user-select: none; }
 .thread-confirm { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 13px; flex-wrap: wrap; }
 .thread-confirm button { padding: 3px 8px; font-size: 12px; }
 
-.new-choice { display: flex; gap: 6px; margin-top: 6px; }
-.new-choice button { flex: 1; }
 .doc-icon { margin-right: 6px; vertical-align: -1px; color: var(--muted); }
 .doc-view { min-height: 0; }
 .doc-scroll { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) clamp(240px, 32%, 340px); }
@@ -201,7 +199,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 .review-label { color: var(--muted); font-size: 13px; }
 .review-summary { border-radius: 999px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw; }
 .review-activity { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
-.review-row { display: flex; gap: 4px; }
+.review-row { display: flex; flex-wrap: wrap; gap: 2px; }
+.review-edit, .review-remove { padding: 2px 5px; }
 .review-name { flex: 1; text-align: left; border: 1px solid transparent; display: flex; align-items: center; gap: 6px; background: var(--panel); }
 .review-row.included .review-name { background: color-mix(in srgb, var(--codex) 16%, var(--panel)); border-color: color-mix(in srgb, var(--codex) 40%, var(--line)); }
 .review-name .check { width: 12px; color: var(--codex); }
@@ -231,3 +230,11 @@ body.resizing { cursor: col-resize; user-select: none; }
 /* A reviewer's reference to a proposal, shown as the words it changes. */
 .prop-ref { color: var(--accent); cursor: pointer; border-bottom: 1px dotted currentColor; }
 .prop-ref.resolved { color: inherit; cursor: help; opacity: 0.75; }
+
+/* Participant name and instructions, inside the participant menus */
+.participant-form { display: flex; flex-direction: column; gap: 8px; padding: 8px 4px 6px; width: min(460px, calc(100vw - 60px)); }
+.review-row .participant-form { flex-basis: 100%; }
+.participant-form input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.participant-form textarea.instructions { font-family: inherit; font-size: 13px; line-height: 1.45; background: var(--bg); min-height: 90px; max-height: 40vh; resize: vertical; }
+.form-hint { color: var(--muted); font-size: 12px; margin: 0; }
+.form-actions { display: flex; justify-content: flex-end; gap: 8px; }

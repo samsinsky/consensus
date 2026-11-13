@@ -59,3 +59,12 @@ describe('participant colors', () => {
     expect(participantColor(all[3], all)).toBe('var(--gemini)');
   });
 });
+
+describe('participant names', () => {
+  it('uses the name the user gave in place of the provider and number', async () => {
+    const a = { id: 'a', provider: 'claude' as const, model: 'opus', promptHash: 'h', ordinal: 1, createdAt: '', name: 'Fact checker' };
+    const b = { ...a, id: 'b', ordinal: 2, name: undefined };
+    expect(participantName(a, [a, b])).toBe('Fact checker');
+    expect(participantName(b, [a, b])).toBe('Claude #2');
+  });
+});

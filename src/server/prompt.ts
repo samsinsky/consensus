@@ -88,3 +88,23 @@ export async function snapshotPrompt(paths: Paths): Promise<string> {
   }
   return hash;
 }
+
+/** The participant's own instructions, appended to its frozen shared prompt. */
+export function withInstructions(base: string, instructions: string): string {
+  return `${base.trimEnd()}\n\n## Your focus\n\nThe user gave you these instructions. Follow them on top of everything above.\n\n${instructions.trim()}\n`;
+}
+
+/** The prompt snapshot a participant runs with: its shared one, plus its instructions when it has any. */
+export async function participantPrompt(paths: Paths, p: { promptHash: string; instructions?: string }): Promise<string> {
+  if (!p.instructions?.trim()) return p.promptHash;
+  const text = withInstructions(await readFile(snapshotPath(paths, p.promptHash), 'utf8'), p.instructions);
+  const hash = promptHash(text);
+  const file = snapshotPath(paths, hash);
+  try {
+    await access(file);
+  } catch {
+    await mkdir(paths.snapshots, { recursive: true });
+    await writeFile(file, text);
+  }
+  return hash;
+}

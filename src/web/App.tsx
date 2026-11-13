@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ModelOption, ProviderId, Settings, ThreadKind, ThreadSummary } from '../shared/types.js';
+import type { ModelOption, ProviderId, Settings, ThreadSummary } from '../shared/types.js';
 import { api } from './api.js';
 import { guardFileDrops } from './dropGuard.js';
 import { clampSidebarWidth, SIDEBAR } from './layout.js';
@@ -68,8 +68,9 @@ export function App() {
     if (thread) refresh();
   }, [thread?.title, thread?.updatedAt, refresh]);
 
-  const newThread = async (kind: ThreadKind = 'chat') => {
-    const t = await api.createThread(kind);
+  // New threads are always docs; older chat threads still open.
+  const newThread = async () => {
+    const t = await api.createThread('doc');
     await refresh();
     setActiveId(t.id);
   };
@@ -103,8 +104,7 @@ export function App() {
           <div className="empty">
             <p>Pick a thread or start a new one.</p>
             <span className="empty-actions">
-              <button onClick={() => newThread('chat')}>New chat</button>
-              <button onClick={() => newThread('doc')}>New doc</button>
+              <button onClick={newThread}>New doc</button>
             </span>
           </div>
         )}
