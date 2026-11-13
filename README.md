@@ -4,6 +4,8 @@ Consensus puts Claude, ChatGPT, and Gemini on the same draft. Each reviewer prop
 
 One model's edits carry one model's blind spots. Consensus replaces copying text between three chat tabs with one document and a margin full of competing suggestions.
 
+![Three reviewers propose different rewrites of the same sentence. The margin card shows all three versions side by side, with each reviewer's reason and vote counts.](docs/images/review.png)
+
 ## How it works
 
 1. **Start a doc.** Paste your draft and write a brief: what the piece does, who reads it, and any limits.
