@@ -41,13 +41,13 @@ export type ForwardContext = {
   originalBlocks?: string[];
   /** The draft the round began from, when the round had one. */
   start?: string;
-  /** Sam's messages during the round, with any critiques he forwarded into them. */
+  /** The user's messages during the round, with any critiques they forwarded into them. */
   requests?: { text: string; quotes: string[] }[];
 };
 
 export const HANDOFF_NOTE = "Drafts below may include the previous writer's commentary. Judge the text on its merits.";
 
-/** Sent with every forward: weigh the feedback, keep the draft unless something is wrong, and hand taste calls to Sam. */
+/** Sent with every forward: weigh the feedback, keep the draft unless something is wrong, and hand taste calls to the user. */
 export const FORWARD_TASK =
   'What to do with this:\n' +
   "1. Treat the other reviewer's draft as the current version. Change it only to fix a real problem: an error, something unclear, or something that misses my requests. If a change comes down to taste, keep the current wording.\n" +
@@ -81,7 +81,7 @@ export function composeOutgoing(text: string, quotes: Quote[], ctx: ForwardConte
   return [...attachmentBlocks, text].filter(Boolean).join('\n\n');
 }
 
-/** Sam's message that produced a reply: his last message to that participant before it. */
+/** The user's message that produced a reply: their last message to that participant before it. */
 function promptOf(thread: Thread, replyId: string): UserMessage | undefined {
   const idx = thread.messages.findIndex((m) => m.id === replyId && m.kind === 'reply');
   if (idx < 0) return undefined;
@@ -93,8 +93,8 @@ function promptOf(thread: Thread, replyId: string): UserMessage | undefined {
 }
 
 /**
- * Builds the handoff for the first quote's reply. The round is Sam's run of messages to that
- * participant, back to his last message to someone else. The receiver never gets its own replies
+ * Builds the handoff for the first quote's reply. The round is the user's run of messages to that
+ * participant, back to their last message to someone else. The receiver never gets its own replies
  * back: they are already in its conversation.
  */
 export function forwardContext(thread: Thread, quotes: Quote[], receiver?: string): ForwardContext {

@@ -5,15 +5,15 @@ Status: Draft for review
 
 ## Purpose
 
-Sam improves copy by routing one LLM's feedback to another. Today he copies text between ChatGPT, Claude, and Gemini tabs by hand. Consensus replaces the copy-paste with a single local app that routes messages between models and runs on his existing ChatGPT, Claude, and Google subscriptions. No API keys, no per-token billing.
+The user improves copy by routing one LLM's feedback to another. Today they copy text between ChatGPT, Claude, and Gemini tabs by hand. Consensus replaces the copy-paste with a single local app that routes messages between models and runs on his existing ChatGPT, Claude, and Google subscriptions. No API keys, no per-token billing.
 
 No free tool does this. Existing multi-model extensions (ChatHub, TabGPT, XPrompt, GenAIPromptExtension) broadcast one prompt to many models; none consensus one model's output into another with a new instruction.
 
 ### Success criteria
 
-- Sam drafts with one model, iterates with it, then forwards any reply (or part of one) plus a new instruction to another model, without leaving the page.
+- The user drafts with one model, iterates with it, then forwards any reply (or part of one) plus a new instruction to another model, without leaving the page.
 - Replies match the quality and depth of the consumer chat apps for prose work.
-- Each model sees only its own conversation plus what Sam forwards.
+- Each model sees only its own conversation plus what the user forwards.
 - Threads persist locally and reload exactly.
 
 ### Non-goals (v1)
@@ -29,13 +29,13 @@ No free tool does this. Existing multi-model extensions (ChatHub, TabGPT, XPromp
 ## Concepts
 
 - **Thread:** one piece of work, such as a homepage hero. Holds participants and a single timeline of messages.
-- **Participant:** one ongoing conversation with one provider and model inside a thread. A thread may hold several participants, including two from the same provider. A participant keeps its provider for life; Sam may change its model and effort at any time without losing history.
-- **Message:** one entry in the timeline. Either Sam to a participant, or a participant's reply. Sam's messages may carry quotes.
+- **Participant:** one ongoing conversation with one provider and model inside a thread. A thread may hold several participants, including two from the same provider. A participant keeps its provider for life; the user may change its model and effort at any time without losing history.
+- **Message:** one entry in the timeline. Either the user to a participant, or a participant's reply. The user's messages may carry quotes.
 - **Quote:** forwarded text from an earlier reply, whole or highlighted.
 
 ## Approach
 
-Consensus drives each provider's official CLI headlessly, signed in with Sam's subscription:
+Consensus drives each provider's official CLI headlessly, signed in with the user's subscription:
 
 | Provider | CLI | Subscription |
 |---|---|---|
@@ -63,7 +63,7 @@ We rejected a browser extension that drives the chat websites. It keeps native c
 
 ### Launch
 
-Sam runs `consensus`. The command starts the local server and opens the browser to the app.
+The user runs `consensus`. The command starts the local server and opens the browser to the app.
 
 ### Provider adapters
 
@@ -110,14 +110,14 @@ Adding a provider later means writing one adapter.
 ### Router
 
 - Sends each message only to the selected participant.
-- Builds the outgoing text for a forwarded reply as a handoff (revised 2026-10-09). The **round** is Sam's run of messages to the forwarded reply's participant, back to his last message to someone else. The receiver never gets its own replies back, since they are already in its conversation (revised 2026-10-13). The handoff carries:
+- Builds the outgoing text for a forwarded reply as a handoff (revised 2026-10-09). The **round** is the user's run of messages to the forwarded reply's participant, back to their last message to someone else. The receiver never gets its own replies back, since they are already in its conversation (revised 2026-10-13). The handoff carries:
   1. A note: "Drafts below may include the previous writer's commentary. Judge the text on its merits."
   2. **Original request:** the first message in the thread that has text, with its attachments (revised 2026-10-13; tracing the forward chain stopped at mid-thread follow-ups such as "delivery time").
   3. **Starting point:** the participant's own previous reply if it had one before the round; else the draft forwarded in at the round's start, unless the receiver wrote it; else its first reply in the round.
-  4. **Requests during the round:** Sam's messages in the round, word for word, with any critiques he forwarded into them, minus the receiver's own replies (the original request is not repeated).
+  4. **Requests during the round:** The user's messages in the round, word for word, with any critiques they forwarded into them, minus the receiver's own replies (the original request is not repeated).
   5. **The forwarded reply**, marked "Feedback from another reviewer". The model never learns which provider wrote it.
-  6. **What to do** (revised 2026-10-13, after models looped on matters of taste): treat the other reviewer's draft as the current version and change it only to fix a real problem (an error, something unclear, a missed request), keeping the current wording on taste; respond briefly and skip points both already agree on; say when the copy is ready and give it unchanged; list taste disagreements under "Your call" for Sam instead of changing them back. Sam's note takes priority if it asks for something else.
-  7. Sam's new message, labeled "My note:" (omitted when empty).
+  6. **What to do** (revised 2026-10-13, after models looped on matters of taste): treat the other reviewer's draft as the current version and change it only to fix a real problem (an error, something unclear, a missed request), keeping the current wording on taste; respond briefly and skip points both already agree on; say when the copy is ready and give it unchanged; list taste disagreements under "Your call" for the user instead of changing them back. The user's note takes priority if it asks for something else.
+  7. The user's new message, labeled "My note:" (omitted when empty).
 
   ```
   Drafts below may include the previous writer's commentary. Judge the text on its merits.
@@ -147,10 +147,10 @@ Adding a provider later means writing one adapter.
   If my note below asks for something different, follow the note.
 
   My note:
-  <Sam's instruction>
+  <the user's instruction>
   ```
 
-  Blocks with nothing to show are omitted; a quote whose source cannot be traced goes as a bare quote. Other reviewers' replies outside the round stay out, which limits anchoring. A model summary of the round (measured at 2.4 to 4.2 seconds with Haiku) is deferred: Sam does not want the wait. Drafts keep their commentary for the same reason; the shared document will separate drafts from comments later.
+  Blocks with nothing to show are omitted; a quote whose source cannot be traced goes as a bare quote. Other reviewers' replies outside the round stay out, which limits anchoring. A model summary of the round (measured at 2.4 to 4.2 seconds with Haiku) is deferred: the user does not want the wait. Drafts keep their commentary for the same reason; the shared document will separate drafts from comments later.
 - Passes the participant's session ID, model, and effort to the adapter, streams events to the browser, and writes the result to the store.
 
 ### Thread store
@@ -196,7 +196,7 @@ Writes go to a temp file and rename into place, so a crash never corrupts a thre
 
 ### Composer and participant chip
 
-- The chip shows the active participant: the last one Sam sent to. Typing and sending keeps the conversation with that participant.
+- The chip shows the active participant: the last one the user sent to. Typing and sending keeps the conversation with that participant.
 - Clicking the chip opens a menu:
   - The thread's participants, to switch the target.
   - **New participant ▸ provider ▸ model and effort**, to add a fresh participant with no history.
@@ -205,7 +205,7 @@ Writes go to a temp file and rename into place, so a crash never corrupts a thre
 
 ### Panes view
 
-- Sam ticks which participants to show. Each gets a column holding only its conversation, with its own composer targeted at that participant.
+- The user ticks which participants to show. Each gets a column holding only its conversation, with its own composer targeted at that participant.
 - Forward works across panes. Everything still appears in the Timeline view; the two views render the same store.
 
 ### Errors
@@ -230,7 +230,7 @@ One global file at `~/.consensus/prompts/default.md`, editable in Settings. Each
 
 ## Attachments
 
-Added 2026-10-06. Sam attaches text documents and images to messages.
+Added 2026-10-06. The user attaches text documents and images to messages.
 
 ### Adding files
 
@@ -252,7 +252,7 @@ Added 2026-10-06. Sam attaches text documents and images to messages.
 
 ### What the model receives
 
-- **Text and documents** go inline, before Sam's text: `<attachment name="brief.docx">…extracted text…</attachment>`.
+- **Text and documents** go inline, before the user's text: `<attachment name="brief.docx">…extracted text…</attachment>`.
 - **Images** go through each CLI's own channel (verified 2026-10-06 with a blue test image under a neutral filename):
   - **Claude:** for messages with images only, the adapter switches to `--input-format stream-json` and sends one user message whose content holds base64 `image` blocks followed by the text. Text-only messages keep the current plain stdin path.
   - **Codex:** one `-i <path>` per image, on both `exec` and `exec fork`.
@@ -287,7 +287,7 @@ Added 2026-10-07. Participants can read web pages and search the web on every tu
 - Codex narrates tool use in earlier messages ("I'll open the page…"); a reply's final text is its last message. Claude's `result` and Antigravity's `response` are already final.
 - The default system prompt adds: "You can read web pages and search the web. When you state a fact from a page, say which page." On 2026-10-13 it also gained "When you revise copy, end with what you changed and why.", so every reply carries its reasoning when forwarded. An untouched copy of an earlier default on disk is upgraded; an edited prompt is left alone.
 - **UI:** while a reply streams, a status line shows its current activity. Under a reply that opened pages, a collapsed **Sources** row shows up to three site favicons (loaded directly from each site, first letter when missing) and "+ N more" for further sites; clicking expands every page as a link.
-- **Risk accepted:** a page or forwarded reply can carry instructions to fetch an attacker's URL with conversation text in it, and Gemini turns can read local files through `view_file`. Sam runs the CLIs in auto mode, which allows more than this. The Sources list makes every fetch visible.
+- **Risk accepted:** a page or forwarded reply can carry instructions to fetch an attacker's URL with conversation text in it, and Gemini turns can read local files through `view_file`. The user runs the CLIs in auto mode, which allows more than this. The Sources list makes every fetch visible.
 
 ## Open questions (resolved 2026-10-05)
 
@@ -302,19 +302,19 @@ Added 2026-10-07. Participants can read web pages and search the web on every tu
 1. **Adapter tests (no quota):** each adapter runs against a fake CLI that replays recorded output. Covers streaming, session capture, resume, model change, Stop, and each error type.
 2. **Router and store tests:** a message reaches only its participant; quotes inline in the fixed format; threads round-trip through disk exactly; atomic writes survive a simulated crash.
 3. **Live smoke test (manual, small quota):** per real CLI, send "reply OK", resume, change model, Stop. Run after any CLI upgrade.
-4. **Quality check:** rerun Sam's Codex vs. ChatGPT comparison with the Consensus prompt and high effort; confirm replies match ChatGPT's depth.
+4. **Quality check:** rerun the user's Codex vs. ChatGPT comparison with the Consensus prompt and high effort; confirm replies match ChatGPT's depth.
 
 ## Future work
 
 ### Automatic looped routing
 
-Sam picks two or more participants and an instruction, such as "revise" for one and "critique" for the other. Consensus then routes replies between them without manual forwarding until one of three conditions ends the loop:
+The user picks two or more participants and an instruction, such as "revise" for one and "critique" for the other. Consensus then routes replies between them without manual forwarding until one of three conditions ends the loop:
 
 - **Convergence:** the critic approves the version, or successive versions stop changing meaningfully.
 - **Stuck loop:** the participants repeat earlier versions or trade the same objections.
-- **Round cap:** a maximum round count Sam sets, to bound quota use.
+- **Round cap:** a maximum round count the user sets, to bound quota use.
 
-Sam can stop the loop at any time and resume manual routing from the last message.
+The user can stop the loop at any time and resume manual routing from the last message.
 
 v1 keeps this addition cheap:
 
@@ -325,12 +325,12 @@ v1 keeps this addition cheap:
 
 Designed 2026-10-13 as doc mode: see `2026-10-13-doc-mode-design.md`.
 
-A single document all participants work on, replacing chat history as the "current state". Participants leave comments anchored to passages, reply in threads, and propose edits as suggestions; a thread resolves when its concern is settled. This merges with automatic looped routing: the loop runs until threads resolve, then Sam reviews what remains.
+A single document all participants work on, replacing chat history as the "current state". Participants leave comments anchored to passages, reply in threads, and propose edits as suggestions; a thread resolves when its concern is settled. This merges with automatic looped routing: the loop runs until threads resolve, then the user reviews what remains.
 
 Risks to design for:
 
-- **False agreement.** Models defer to each other, so threads may resolve without the text improving. Guardrails: only the comment's author or Sam resolves; a reviewer restates why its concern is met before resolving; capped rounds; unresolved disagreements escalate to Sam.
-- **Losing the big picture.** Comment-by-comment work becomes line editing; nobody asks whether the piece is right. Counter with document-level threads not anchored to a passage, a structural pass against the brief before line edits each round, an editor-in-chief participant that judges the whole draft and can reopen threads or propose a rewrite, and a blind reader that never sees the comments. Convergence requires a whole-draft check against the brief or Sam's sign-off, not just zero open threads.
+- **False agreement.** Models defer to each other, so threads may resolve without the text improving. Guardrails: only the comment's author or the user resolves; a reviewer restates why its concern is met before resolving; capped rounds; unresolved disagreements escalate to the user.
+- **Losing the big picture.** Comment-by-comment work becomes line editing; nobody asks whether the piece is right. Counter with document-level threads not anchored to a passage, a structural pass against the brief before line edits each round, an editor-in-chief participant that judges the whole draft and can reopen threads or propose a rewrite, and a blind reader that never sees the comments. Convergence requires a whole-draft check against the brief or the user's sign-off, not just zero open threads.
 - **Anchor drift.** Comments must follow their passage as text changes, or show clearly as orphaned.
 - **Structured output.** Comments and suggestions need schema-enforced JSON from each CLI; all three expose a JSON schema option, unverified for this use.
 

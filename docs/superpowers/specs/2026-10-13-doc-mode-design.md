@@ -5,34 +5,34 @@ Builds on `2026-10-05-consensus-design.md` (the "Shared document with comment th
 
 ## Purpose
 
-Forwarding replies between participants loops: each model restates its taste, settled points come back, and every round produces a full rewrite. Doc mode replaces the back-and-forth with one document that every participant reviews. Each participant proposes specific changes with a reason, replies to the other proposals, and leaves one note on the whole draft. Sam edits the document live, settles proposals, and sends the next round when he wants one.
+Forwarding replies between participants loops: each model restates its taste, settled points come back, and every round produces a full rewrite. Doc mode replaces the back-and-forth with one document that every participant reviews. Each participant proposes specific changes with a reason, replies to the other proposals, and leaves one note on the whole draft. The user edits the document live, settles proposals, and sends the next round when he wants one.
 
 ### Success criteria
 
-- Sam can paste a draft, add a brief, pick reviewers, and get proposals in the margin within one round.
+- The user can paste a draft, add a brief, pick reviewers, and get proposals in the margin within one round.
 - Every proposed change shows who proposed it and why, inline in the text and in a margin card.
-- Sam can accept, reject, edit before accepting, or reply to any proposal, and type in the document at any time, including while a round runs.
+- The user can accept, reject, edit before accepting, or reply to any proposal, and type in the document at any time, including while a round runs.
 - Competing proposals on the same text show as one card with options, not stacked edits.
-- Participants react to each other's proposals in the next round, and taste disagreements are tagged "Your call" for Sam.
+- Participants react to each other's proposals in the next round, and taste disagreements are tagged "Your call" for the user.
 - One click copies the document as formatted text.
 
 ### Non-goals (v1)
 
-- Real-time collaboration between people. Only Sam edits live; models act in rounds.
-- Rounds that run automatically. Sam starts each round. Automatic looping stays in future work.
+- Real-time collaboration between people. Only the user edits live; models act in rounds.
+- Rounds that run automatically. The user starts each round. Automatic looping stays in future work.
 - A reply pass inside a round (models replying to same-round proposals). Cross-review happens in the next round.
 - A chat panel inside a doc thread.
-- Tables, images, comments by people other than Sam, sharing, or permissions.
+- Tables, images, comments by people other than the user, sharing, or permissions.
 - Formatting beyond paragraphs, headings, bold, italic, lists, and links.
 
 ## Concepts
 
 - **Doc thread:** a thread whose content is a document instead of a timeline. A thread is either a chat or a doc.
-- **Brief:** Sam's short description of the task, audience, and constraints, stored with the doc and sent every round.
+- **Brief:** The user's short description of the task, audience, and constraints, stored with the doc and sent every round.
 - **Round:** one send to every included participant, all reviewing the same saved version of the document at once.
 - **Proposal:** one change from one participant: the quoted text, its replacement, and a reason. Shown inline and as one margin card.
 - **Group:** open proposals whose quoted text overlaps, shown as one card with options.
-- **Reply:** a message on a proposal's thread, from Sam or a participant. A participant's reply carries a stance: agree, disagree, or your call.
+- **Reply:** a message on a proposal's thread, from the user or a participant. A participant's reply carries a stance: agree, disagree, or your call.
 - **Overall note:** each participant's one comment per round on the whole draft.
 - **Included:** whether a participant takes part in the next round. Toggled by clicking its name.
 
@@ -68,13 +68,13 @@ Forwarding replies between participants loops: each model restates its taste, se
 
 ### Starting a doc
 
-- **New thread** offers Chat or Doc. Doc opens an empty document with a brief field above it. Sam pastes or types the draft and writes the brief. The brief field accepts attachments through the existing paperclip, drop, and paste, with the existing limits.
-- **Open as doc** on any chat reply creates a new doc thread: the reply's text becomes the document, the chat thread's first message becomes the brief, and its participants are copied with fresh sessions (no chat memory), so a doc never shares a CLI conversation with a chat thread. Sam deletes any commentary the reply carried.
+- **New thread** offers Chat or Doc. Doc opens an empty document with a brief field above it. The user pastes or types the draft and writes the brief. The brief field accepts attachments through the existing paperclip, drop, and paste, with the existing limits.
+- **Open as doc** on any chat reply creates a new doc thread: the reply's text becomes the document, the chat thread's first message becomes the brief, and its participants are copied with fresh sessions (no chat memory), so a doc never shares a CLI conversation with a chat thread. The user deletes any commentary the reply carried.
 - The thread title comes from the brief's first line, renameable as today.
 
 ### The document
 
-- Sam edits directly at any time, including during a round. Edits change the document; they are not proposals.
+- The user edits directly at any time, including during a round. Edits change the document; they are not proposals.
 - Autosave runs about a second after typing stops. Send saves first.
 - Formatting: paragraphs, headings, bold, italic, bulleted and numbered lists, and links, stored as Markdown. No toolbar: bold and italic use the usual shortcuts (Cmd+B, Cmd+I), links come from pasting a URL over selected text or typing `[text](url)`, and Markdown typed at the start of a line ("## ", "- ", "1. ") formats it.
 - **Copy:** an icon in the document's top corner copies the whole document to the clipboard as formatted text (HTML) with a plain-text fallback, so it pastes cleanly into Google Docs, LinkedIn, or Gmail. A brief "Copied" confirmation shows.
@@ -90,11 +90,11 @@ Forwarding replies between participants loops: each model restates its taste, se
 
 - **One card per proposal.** Cards sit level with their text and push each other down when text is close together, as in Google Docs.
 - **Card contents:** author label (`participantName` with model and effort, as in the chip), the reason, agree and disagree counts from participant replies (the author counts as agree), the "Your call" tag when it applies, the reply thread, Accept and Reject buttons, and a reply box.
-- **Editing before accepting:** Sam can click into the replacement text on the card, change it, and accept his version.
+- **Editing before accepting:** The user can click into the replacement text on the card, change it, and accept their version.
 - **Groups:** overlapping open proposals share one card titled "N versions". Each option shows its author, replacement, reason, and its own thread. Selecting an option switches the inline view to it. Accepting one marks the others "not chosen". "Reject all" rejects every option. Selecting an option is a view choice only; it is not sent to participants.
 - **Merged proposals:** identical replacements of the same text from the same round become one proposal with several authors ("Claude Opus High and ChatGPT Terra High"). A participant that later proposes an exact copy of an open proposal is recorded as an agree reply on it instead.
 - **Your call:** the tag shows when any participant replied "your call" on the proposal or on any option of its group.
-- **Out of date:** when the quoted text no longer exists (Sam edited it, or another proposal's acceptance removed it), the card turns grey, says "Text changed", and offers only Dismiss.
+- **Out of date:** when the quoted text no longer exists (the user edited it, or another proposal's acceptance removed it), the card turns grey, says "Text changed", and offers only Dismiss.
 - **Resolved:** accepted, rejected, not chosen, and dismissed proposals collapse into one thin "N resolved" line at the bottom of the margin that expands to show them with their threads.
 - **Overall notes:** pinned at the top of the margin, one per participant for the latest round, each expandable to the participant's full answer for that round. Earlier rounds' notes are reachable from the same card. Proposals that failed the quote check are listed on their author's note card with the reason ("matched 3 places", "not found").
 
@@ -126,7 +126,7 @@ Per participant, on its overall note card: the adapter error with its fix (as in
 
 ### Sending
 
-Sam clicks Send. The server saves a snapshot of the current document, then sends the round message to every included participant in parallel, each in its own session. Open proposals, including ones Sam has not touched, go as undecided. Sam never has to resolve anything before sending.
+The user clicks Send. The server saves a snapshot of the current document, then sends the round message to every included participant in parallel, each in its own session. Open proposals, including ones the user has not touched, go as undecided. The user never has to resolve anything before sending.
 
 ### What each participant receives
 
@@ -135,7 +135,7 @@ The round message, built fresh each round:
 ~~~
 Brief:
 <brief>
-…Sam's brief…
+…the user's brief…
 </brief>
 <attachment …>…</attachment>            (brief attachments, text extracted; images as image inputs)
 
@@ -176,10 +176,10 @@ For "quote", copy the exact words from the document without formatting marks, lo
 ~~~
 
 - A proposal is labeled `by="you"` when the receiving participant wrote it and `by="another reviewer"` otherwise. Participants never learn which provider wrote what.
-- Sam's replies are labeled "Me".
-- Rejected proposals list those resolved since the participant's previous round, with Sam's latest reply if any, so the participant doesn't propose them again.
+- The user's replies are labeled "Me".
+- Rejected proposals list those resolved since the participant's previous round, with the user's latest reply if any, so the participant doesn't propose them again.
 - Accepted changes need no section: they are in the document.
-- The round instructions take precedence over Sam's system prompt line "Provide the full rewrites in each response" through rule 4. Doc rounds keep the same system prompt snapshot as the participant's chat use.
+- The round instructions take precedence over the user's system prompt line "Provide the full rewrites in each response" through rule 4. Doc rounds keep the same system prompt snapshot as the participant's chat use.
 
 ### Reading the answer
 
@@ -304,7 +304,7 @@ All behind the existing Host, Origin, and content-type checks.
 
 - **Parallel rounds, no reply pass.** Independent first opinions and speed; cross-review happens next round. The reply pass can be added later.
 - **Proposals anchored by quote, not stored in the text.** Avoids tracked-change marks in the editor; edits make proposals out of date instead of corrupting them.
-- **JSON block in the answer, not CLI schema options.** One parser across three CLIs, with prose kept for Sam. CLI schema options stay a later upgrade.
+- **JSON block in the answer, not CLI schema options.** One parser across three CLIs, with prose kept for the user. CLI schema options stay a later upgrade.
 - **Fresh sessions for Open as doc.** A doc never shares a CLI conversation with a chat thread.
 - **Built in Consensus, not Google Docs.** No Google sign-in setup, no dependency on the Docs API released 2026-09-30, real reviewer labels. Copy covers moving the result into Docs.
 

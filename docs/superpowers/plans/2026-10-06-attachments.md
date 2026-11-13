@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let Sam attach text documents and images to messages by drag and drop, paperclip or paste; send them to Claude, ChatGPT and Gemini through each CLI's own channel; store them with their thread; and delete threads with their files.
+**Goal:** Let the user attach text documents and images to messages by drag and drop, paperclip or paste; send them to Claude, ChatGPT and Gemini through each CLI's own channel; store them with their thread; and delete threads with their files.
 
 **Architecture:** A new `AttachmentStore` saves each upload under `~/.consensus/threads/<threadId>/attachments/<id>/` and extracts document text on upload. Messages hold attachment references. The router inlines document text as `<attachment>` blocks and passes images to adapters as `ImageInput[]`; Claude switches to stream-json input for image turns, Codex adds `-i` flags, Gemini copies images into its workdir and runs a `view_file`-only agent variant for that turn.
 

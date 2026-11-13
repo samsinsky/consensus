@@ -107,7 +107,7 @@ export type Stance = 'agree' | 'disagree' | 'your_call';
 export type ProposalStatus = 'open' | 'accepted' | 'rejected' | 'not_chosen' | 'dismissed' | 'superseded';
 
 export type ProposalReply = {
-  /** 'user' for Sam, else a participant id. */
+  /** 'user' for the person using the app, else a participant id. */
   from: string;
   stance?: Stance;
   text: string;

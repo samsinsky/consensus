@@ -31,7 +31,7 @@ export function placeProposals(proposals: Proposal[], index: TextIndex): { group
   return { groups, stale };
 }
 
-/** The option a group shows inline: the one Sam picked, else the first. */
+/** The option a group shows inline: the one the user picked, else the first. */
 export function shownOption(group: Group, picked: Set<string>): Placed {
   return group.options.find((o) => picked.has(o.proposal.id)) ?? group.options[0];
 }

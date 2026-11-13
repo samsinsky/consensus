@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build Consensus, a local web app that routes prose work between Claude, ChatGPT, and Gemini participants through their official CLIs on Sam's existing subscriptions.
+**Goal:** Build Consensus, a local web app that routes prose work between Claude, ChatGPT, and Gemini participants through their official CLIs on the user's existing subscriptions.
 
 **Architecture:** A Node + TypeScript server spawns `claude`, `codex`, and `agy` headlessly through one adapter interface, keeps threads as JSON files under `~/.consensus`, and streams events to a React page over Server-Sent Events. The router sends each message only to its chosen participant and inlines forwarded quotes; Claude and Codex fork their session every turn so a stopped reply never enters memory.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Node 24 and TypeScript throughout; ESM (`"type": "module"`); relative imports end in `.js`.
-- No API keys. Every model call goes through `claude`, `codex`, or `agy` signed in with Sam's subscription.
+- No API keys. Every model call goes through `claude`, `codex`, or `agy` signed in with the user's subscription.
 - Provider IDs are exactly `'claude' | 'codex' | 'gemini'`; display names are Claude, ChatGPT, Gemini.
 - The user-facing term is "participant", never "chat", "agent", or "bot". Threads are "threads", never "pieces".
 - Quote format sent to models, verbatim: `Feedback from another reviewer:\n<quoted>\n…\n</quoted>`. Never name the source provider.
@@ -1359,7 +1359,7 @@ git commit -m "feat: add Claude Code adapter with per-turn session forks"
 - Consumes: Task 4 exports.
 - Produces: `createCodexAdapter(opts: CliOptions & { codexHome?: string }): ProviderAdapter`.
 
-Verified stream (Codex CLI 0.160.1, `exec --json`): `{"type":"thread.started","thread_id":"…"}`, `{"type":"turn.started"}`, `{"type":"item.completed","item":{"type":"agent_message","text":"…"}}`, `{"type":"turn.completed","usage":{…}}`. No text deltas; the whole message arrives in one item. A model switch on resume emits `{"type":"item.completed","item":{"type":"error","message":"This session was recorded with model …"}}` and then succeeds. `codex exec fork <id>` prints a new `thread_id` and keeps the history. `exec fork` rejects `-s`, so the sandbox goes through `-c sandbox_mode="read-only"`. `--ignore-user-config` skips Sam's plugins and `notify` hook while keeping ChatGPT sign-in.
+Verified stream (Codex CLI 0.160.1, `exec --json`): `{"type":"thread.started","thread_id":"…"}`, `{"type":"turn.started"}`, `{"type":"item.completed","item":{"type":"agent_message","text":"…"}}`, `{"type":"turn.completed","usage":{…}}`. No text deltas; the whole message arrives in one item. A model switch on resume emits `{"type":"item.completed","item":{"type":"error","message":"This session was recorded with model …"}}` and then succeeds. `codex exec fork <id>` prints a new `thread_id` and keeps the history. `exec fork` rejects `-s`, so the sandbox goes through `-c sandbox_mode="read-only"`. `--ignore-user-config` skips the user's plugins and `notify` hook while keeping ChatGPT sign-in.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3984,10 +3984,10 @@ Run `npm run smoke` after upgrading any of the three CLIs.
 Run: `npm run build && npm link && which consensus`
 Expected: prints a path ending in `/consensus`.
 
-- [ ] **Step 5: Quality check with Sam**
+- [ ] **Step 5: Quality check with the user**
 
-Run `consensus`. With Sam, rerun his earlier Codex vs ChatGPT comparison: same prompt and copy, sent to ChatGPT · gpt-6-luna high, Claude · opus high, and Gemini · gemini-3.1-pro-high in one thread. Sam compares the replies with the ChatGPT web app's answer.
-Expected: Sam judges the replies at least as deep and useful as the web app's. If one provider reads noticeably more coding-flavored or terse, note it and adjust `~/.consensus/prompts/default.md` from Settings before closing the task.
+Run `consensus`. With the user, rerun their earlier Codex vs ChatGPT comparison: same prompt and copy, sent to ChatGPT · gpt-6-luna high, Claude · opus high, and Gemini · gemini-3.1-pro-high in one thread. The user compares the replies with the ChatGPT web app's answer.
+Expected: the user judges the replies at least as deep and useful as the web app's. If one provider reads noticeably more coding-flavored or terse, note it and adjust `~/.consensus/prompts/default.md` from Settings before closing the task.
 
 - [ ] **Step 6: Commit**
 

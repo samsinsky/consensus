@@ -52,7 +52,7 @@ async function* send(opts: CodexOptions, req: SendRequest): AsyncGenerator<Adapt
     '-c', 'sandbox_mode="read-only"',
     // Codex defaults every model to low verbosity, which suits a terminal, not prose.
     '-c', 'model_verbosity="high"',
-    // "cached" serves an index only; "live" can open the pages Sam sends.
+    // "cached" serves an index only; "live" can open the pages the user sends.
     '-c', 'web_search="live"',
     ...DISABLED_FEATURES.flatMap((f) => ['-c', `features.${f}=false`]),
   ];

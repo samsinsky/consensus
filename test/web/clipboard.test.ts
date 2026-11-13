@@ -4,12 +4,12 @@ import { cleanText, copyFormatted, tightHtml } from '../../src/web/doc/clipboard
 
 describe('tightHtml', () => {
   it('joins paragraphs into tight lines, keeping formatting and only the blank lines the writer left', () => {
-    expect(tightHtml('<p></p><p>Hi <strong>Michael</strong>,</p><p></p><p>Thanks!</p><p>Thanks,</p><p>Sam</p><p></p>')).toBe(
-      '<div>Hi <strong>Michael</strong>,<br><br>Thanks!<br>Thanks,<br>Sam</div>',
+    expect(tightHtml('<p></p><p>Hi <strong>Taylor</strong>,</p><p></p><p>Thanks!</p><p>Thanks,</p><p>Alex</p><p></p>')).toBe(
+      '<div>Hi <strong>Taylor</strong>,<br><br>Thanks!<br>Thanks,<br>Alex</div>',
     );
   });
   it('removes hidden characters and trailing spaces', () => {
-    expect(tightHtml('<p>the direction​ </p><p>Best,  <br>Sam</p>')).toBe('<div>the direction<br>Best,<br>Sam</div>');
+    expect(tightHtml('<p>the direction​ </p><p>Best,  <br>Alex</p>')).toBe('<div>the direction<br>Best,<br>Alex</div>');
   });
   it('keeps a link\'s target and drops every other attribute', () => {
     expect(tightHtml('<p class="x">See <a target="_blank" rel="noopener" class="y" href="https://x.com">this</a></p>')).toBe(
@@ -17,15 +17,15 @@ describe('tightHtml', () => {
     );
   });
   it('keeps lists, without their margins', () => {
-    expect(tightHtml('<p>Two things:</p><ul><li><p>one</p></li></ul><p>Sam</p>')).toBe(
-      '<div>Two things:</div><ul style="margin: 0"><li><p style="margin: 0">one</p></li></ul><div>Sam</div>',
+    expect(tightHtml('<p>Two things:</p><ul><li><p>one</p></li></ul><p>Alex</p>')).toBe(
+      '<div>Two things:</div><ul style="margin: 0"><li><p style="margin: 0">one</p></li></ul><div>Alex</div>',
     );
   });
 });
 
 describe('cleanText', () => {
   it('keeps the writer\'s blank lines and strips hidden characters', () => {
-    expect(cleanText('\nHi,\n\nThank you, \nSa­m  \n')).toBe('Hi,\n\nThank you,\nSam');
+    expect(cleanText('\nHi,\n\nThank you, \nAl­ex  \n')).toBe('Hi,\n\nThank you,\nAlex');
   });
 });
 

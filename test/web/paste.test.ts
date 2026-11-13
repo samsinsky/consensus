@@ -16,8 +16,8 @@ afterEach(() => editor?.destroy());
 const make = (md = '') =>
   (editor = new Editor({ element: document.body.appendChild(document.createElement('div')), extensions: docExtensions(), content: md, contentType: 'markdown' }));
 
-const EMAIL = "Hi Jake,\n\nThanks for following up, that's great news!\n\nHave a great weekend!\n\nBest, \nSam";
-const LINES = "<p>Hi Jake,</p><p></p><p>Thanks for following up, that's great news!</p><p></p><p>Have a great weekend!</p><p></p><p>Best,</p><p>Sam</p>";
+const EMAIL = "Hi Jordan,\n\nThanks for following up, that's great news!\n\nHave a great weekend!\n\nBest, \nAlex";
+const LINES = "<p>Hi Jordan,</p><p></p><p>Thanks for following up, that's great news!</p><p></p><p>Have a great weekend!</p><p></p><p>Best,</p><p>Alex</p>";
 
 describe('pasting into the doc', () => {
   it('keeps plain text lines and blank lines exactly', () => {
@@ -29,15 +29,15 @@ describe('pasting into the doc', () => {
   it('keeps an email client\'s blank lines, which arrive as <div><br></div>', () => {
     const ed = make();
     ed.view.pasteHTML(
-      "<div>Hi Jake,</div><div><br></div><div>Thanks for following up, that's great news!</div><div><br></div><div>Have a great weekend!</div><div><br></div><div>Best,&nbsp;</div><div>Sam</div>",
+      "<div>Hi Jordan,</div><div><br></div><div>Thanks for following up, that's great news!</div><div><br></div><div>Have a great weekend!</div><div><br></div><div>Best,&nbsp;</div><div>Alex</div>",
     );
     expect(ed.getHTML()).toBe(LINES);
   });
 
   it('turns line breaks inside a paragraph into lines, keeping formatting', () => {
     const ed = make();
-    ed.view.pasteHTML('<p>Hi <strong>Jake</strong>,<br><br>Thanks!</p><p>Best, <br>Sam</p>');
-    expect(ed.getHTML()).toBe('<p>Hi <strong>Jake</strong>,</p><p></p><p>Thanks!</p><p>Best,</p><p>Sam</p>');
+    ed.view.pasteHTML('<p>Hi <strong>Jordan</strong>,<br><br>Thanks!</p><p>Best, <br>Alex</p>');
+    expect(ed.getHTML()).toBe('<p>Hi <strong>Jordan</strong>,</p><p></p><p>Thanks!</p><p>Best,</p><p>Alex</p>');
   });
 
   it('survives saving and reloading', () => {

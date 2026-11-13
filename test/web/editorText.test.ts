@@ -14,7 +14,7 @@ const make = (md: string) => (editor = new Editor({ element: document.createElem
 
 const FIXTURES = [
   '## About me\n\nI **ship** *fast* and [write](https://x.com) code.\n\n- one\n- two & three\n\n1. first\n\n"Quoted" it\'s 1 < 2',
-  'I make complicated systems feel simple at every layer: schema, algorithm, and interface.\n\nAs founding PM at Galley Solutions, I built the product-led sales motion.',
+  'I make complicated systems feel simple at every layer: schema, algorithm, and interface.\n\nAs the first PM at a small startup, I built the product-led sales motion.',
   'Line one  \nline two after a hard break.\n\n> A quote block.',
 ];
 
